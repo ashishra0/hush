@@ -14,12 +14,12 @@ A task is done when its criteria pass, `swift build` is warning-free and `swift 
 
 ## M1 — P0
 
-**P0-01 · Backend · Contract v1** · deps: none · `todo`
+**P0-01 · Backend · Contract v1** · deps: none · `done`
 - [ ] `docs/CONTRACTS.md` lists the public types and signatures for: open the store (file or in-memory), create task, complete task, list open tasks as a tree, observe changes, open-task count.
 - [ ] The task type already carries parent, sibling order, note, collapsed, createdAt, completedAt, deletedAt, so P1 adds no breaking change.
 - [ ] The signatures compile in `HushCore` (bodies may be unimplemented) so Frontend can build against them. Ship this before P0-02.
 
-**P0-02 · Backend · Schema, migrations, Inbox seed** · deps: P0-01 · `todo`
+**P0-02 · Backend · Schema, migrations, Inbox seed** · deps: P0-01 · `done`
 - [ ] Given no DB file, when the store opens, then the file is created at the ARCHITECTURE path and contains exactly one task: root-level "Inbox".
 - [ ] Given an existing DB, when the store opens again, then no second Inbox is created and existing tasks are unchanged.
 - [ ] Completing, deleting, renaming or moving Inbox fails with a typed error and changes nothing.
@@ -74,7 +74,7 @@ A task is done when its criteria pass, `swift build` is warning-free and `swift 
 **P1-01 · Backend · Contract v2** · deps: P0-03 · `todo`
 - [ ] CONTRACTS.md adds signatures for everything in P1-02 to P1-06, compiling, before any of them is implemented. Frontend sign-off recorded in the "Requests" section.
 
-**P1-02 · Backend · Tree operations** · deps: P1-01 · `todo`
+**P1-02 · Backend · Tree operations** · deps: P1-01 · `done`
 - [ ] Create at a given parent and index; rename; set note; set collapsed (persisted).
 - [ ] Indent: the task becomes the last child of its previous sibling, taking its subtree; no-op with no previous sibling.
 - [ ] Outdent: the task becomes the sibling immediately after its former parent; no-op at root.
@@ -82,23 +82,23 @@ A task is done when its criteria pass, `swift build` is warning-free and `swift 
 - [ ] After any sequence of operations, sibling orders are gap-free and unique (property-style test).
 - [ ] The subtree query for any node returns open descendants plus an open-descendant count per node.
 
-**P1-03 · Backend · Cascade complete and soft delete** · deps: P1-02 · `todo`
+**P1-03 · Backend · Cascade complete and soft delete** · deps: P1-02 · `done`
 - [ ] Completing a parent gives the parent and every open descendant a completedAt in one transaction.
 - [ ] Delete sets deletedAt on the task and all its open descendants; deleted tasks appear in no list, count or History.
 - [ ] Invariant test: no open task ever has a completed or deleted ancestor.
 
-**P1-04 · Backend · Undo / redo** · deps: P1-03 · `todo`
+**P1-04 · Backend · Undo / redo** · deps: P1-03 · `done`
 - [ ] One undo step reverses exactly one user action: create, rename, note edit, complete (including the whole cascade), delete (whole subtree), indent, outdent, move.
 - [ ] Undo restores the task to its exact prior parent and index. Redo re-applies it. A new action clears redo.
 - [ ] The stack holds at least 50 steps, is app-wide and in-memory, and is empty after relaunch.
 - [ ] Undo and redo with an empty stack are no-ops, not errors.
 
-**P1-05 · Backend · History and restore** · deps: P1-03 · `todo`
+**P1-05 · Backend · History and restore** · deps: P1-03 · `done`
 - [ ] The history query returns completed, non-deleted tasks, newest first, each with title, completedAt, parent path and local-day key using the 04:00 boundary (tests at 03:59 and 04:00, and across a DST change).
 - [ ] Restore clears completedAt on that one task and places it per D5; descendants completed with it stay in History.
 - [ ] Count of tasks finished "today" (04:00 boundary) is available.
 
-**P1-06 · Backend · Parent search** · deps: P1-02 · `todo`
+**P1-06 · Backend · Parent search** · deps: P1-02 · `done`
 - [ ] Given a query string, returns open tasks whose title starts with it, case-insensitive, most recently modified first, max 5, each with its path. Empty query returns nothing.
 
 **P1-07 · Frontend · Nested outline rendering** · deps: P0-09, P1-01 · `todo`
@@ -151,7 +151,7 @@ A task is done when its criteria pass, `swift build` is warning-free and `swift 
 
 ## M3 — P2
 
-**P2-01 · Backend · Today summary** · deps: P1-05 · `todo`
+**P2-01 · Backend · Today summary** · deps: P1-05 · `done`
 - [ ] One query returns: finished-today count (04:00 boundary), the 3 most recently finished titles, and the total open count.
 
 **P2-02 · Frontend · Daily Closure card** · deps: P2-01 · `todo`

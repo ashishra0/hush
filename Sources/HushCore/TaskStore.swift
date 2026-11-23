@@ -23,6 +23,7 @@ public final class TaskStore: Sendable {
 
     private let db: DatabaseQueue
     private let now: @Sendable () -> Date
+    private let undoLog = UndoLog()
 
     public init(path: String, now: @escaping @Sendable () -> Date = { Date() }) throws {
         self.db = try DatabaseQueue(path: path)
@@ -140,7 +141,7 @@ public final class TaskStore: Sendable {
     public func create(title: String, note: String = "", parent: TaskID? = nil, after: TaskID? = nil) throws -> TaskItem {
         let title = try Self.normalizedTitle(title), note = try Self.checkedNote(note)
         let ts = now().timeIntervalSince1970
-        return try db.write { db in
+        return try record { db in
             if let p = parent { try db.requireOpen(p.raw) }
             var sibs = try db.openChildren(of: parent?.raw)
             let idx = after.flatMap { a in sibs.firstIndex(of: a.raw).map { $0 + 1 } } ?? sibs.count
@@ -156,7 +157,7 @@ public final class TaskStore: Sendable {
     @discardableResult
     public func update(_ id: TaskID, title: String? = nil, note: String? = nil) throws -> TaskItem {
         let title = try title.map(Self.normalizedTitle), note = try note.map(Self.checkedNote)
-        return try db.write { db in
+        return try record { db in
             let t = try db.task(id.raw)
             if t.isInbox && title != nil { throw HushError.inboxProtected }
             try db.execute(sql: "UPDATE task SET title = ?, note = ? WHERE id = ?",
@@ -167,7 +168,7 @@ public final class TaskStore: Sendable {
 
     /// Move under `newParent` (nil = top level) at `index` among open siblings (nil/too large = end).
     public func move(_ id: TaskID, newParent: TaskID?, index: Int? = nil) throws {
-        try db.write { db in
+        try record { db in
             let t = try db.task(id.raw)
             if t.isInbox { throw HushError.inboxProtected }
             if let p = newParent {
@@ -196,7 +197,7 @@ public final class TaskStore: Sendable {
 
     /// Becomes the next sibling of its parent. Throws `.cannotOutdent` at top level.
     public func outdent(_ id: TaskID) throws {
-        try db.write { db in
+        try record { db in
             let t = try db.task(id.raw)
             if t.isInbox { throw HushError.inboxProtected }
             guard let p = t.parentID else { throw HushError.cannotOutdent }
@@ -218,7 +219,7 @@ public final class TaskStore: Sendable {
     public func moveDown(_ id: TaskID) throws -> Bool { try shift(id, by: 1) }
 
     private func shift(_ id: TaskID, by d: Int) throws -> Bool {
-        try db.write { db in
+        try record { db in
             let t = try db.task(id.raw)
             if t.isInbox { throw HushError.inboxProtected }
             var sibs = try db.openChildren(of: t.parentID?.raw)
@@ -234,7 +235,7 @@ public final class TaskStore: Sendable {
     /// Completes the task and all its open descendants with one timestamp.
     public func complete(_ id: TaskID) throws -> CompletionReceipt {
         let ts = now()
-        return try db.write { db in
+        return try record { db in
             let t = try db.task(id.raw)
             if t.isInbox { throw HushError.inboxProtected }
             try db.requireOpen(id.raw)
@@ -248,6 +249,7 @@ public final class TaskStore: Sendable {
 
     public func undoComplete(_ r: CompletionReceipt) throws {
         try db.write { db in
+            undoLog.clear()  // not on the undo stack (D21 / receipt API)
             try db.execute(sql: "UPDATE task SET completedAt = NULL WHERE id IN (\(r.ids.map { String($0.raw) }.joined(separator: ",")))")
             try db.renumberParents(of: r.ids.map(\.raw))
         }
@@ -256,7 +258,7 @@ public final class TaskStore: Sendable {
     /// Soft-deletes the task and its whole subtree.
     public func delete(_ id: TaskID) throws -> DeletionReceipt {
         let ts = now().timeIntervalSince1970
-        return try db.write { db in
+        return try record { db in
             let t = try db.task(id.raw)
             if t.isInbox { throw HushError.inboxProtected }
             let ids = try db.subtree(of: id.raw, notDeleted: true)
@@ -269,6 +271,7 @@ public final class TaskStore: Sendable {
 
     public func undoDelete(_ r: DeletionReceipt) throws {
         try db.write { db in
+            undoLog.clear()  // not on the undo stack (D21 / receipt API)
             try db.execute(sql: "UPDATE task SET deletedAt = NULL WHERE id IN (\(r.ids.map { String($0.raw) }.joined(separator: ",")))")
             try db.renumberParents(of: r.ids.map(\.raw))
         }
@@ -279,6 +282,7 @@ public final class TaskStore: Sendable {
     @discardableResult
     public func restore(fromHistory id: TaskID) throws -> TaskItem {
         try db.write { db in
+            undoLog.clear()  // not on the undo stack (D21 / receipt API)
             let t = try db.task(id.raw)
             var p = t.parentID?.raw
             while let cur = p {
@@ -292,6 +296,64 @@ public final class TaskStore: Sendable {
             try db.execute(sql: "UPDATE task SET completedAt = NULL, parentId = ?, position = ? WHERE id = ?",
                            arguments: [p, sibs.count, id.raw])
             return try db.task(id.raw)
+        }
+    }
+
+    // MARK: Undo / redo (D21)
+
+    public var canUndo: Bool { undoLog.canUndo }
+    public var canRedo: Bool { undoLog.canRedo }
+
+    /// Reverts the last create/rename/note/complete/delete/indent/outdent/move. Returns the ids
+    /// it touched (empty = nothing to undo).
+    @discardableResult public func undo() throws -> [TaskID] { try replay(redo: false) }
+    @discardableResult public func redo() throws -> [TaskID] { try replay(redo: true) }
+
+    private func replay(redo: Bool) throws -> [TaskID] {
+        try db.write { db in
+            guard let step = redo ? undoLog.popRedo() : undoLog.popUndo() else { return [] }
+            for r in redo ? step.after : step.before { try r.write(db) }
+            // positions come back from the snapshots, so no renumbering is needed
+            undoLog.push(step, toUndo: redo, keepRedo: true)
+            return step.after.map { TaskID($0.id) }
+        }
+    }
+
+    /// Runs a user action and logs the row-level diff as one undo step.
+    // ponytail: snapshots every row per action (O(n)); fine for thousands of tasks, switch to affected-id diffs beyond that.
+    private func record<T>(_ body: (Database) throws -> T) throws -> T {
+        try db.write { db in
+            let before = try RowState.all(db)
+            let result = try body(db)
+            let after = try RowState.all(db)
+            var b: [RowState] = [], a: [RowState] = []
+            for (id, new) in after {
+                if let old = before[id] { if old != new { b.append(old); a.append(new) } }
+                else { var gone = new; gone.deletedAt = 1; b.append(gone); a.append(new) }  // created: undo = soft delete
+            }
+            if !a.isEmpty { undoLog.push(UndoStep(before: b, after: a), toUndo: true, keepRedo: false) }
+            return result
+        }
+    }
+
+    /// Open tasks whose title starts with `prefix` (case-insensitive), newest created first, with paths (D7).
+    public func searchParents(prefix: String, limit: Int = 5) throws -> [ParentMatch] {
+        let q = prefix.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return [] }
+        let esc = q.replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "%", with: "\\%").replacingOccurrences(of: "_", with: "\\_")
+        return try db.read { db in
+            let all = try Row.fetchAll(db, sql: "SELECT * FROM task WHERE deletedAt IS NULL").map(TaskItem.init)
+            let byID = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
+            let hits = try Row.fetchAll(db, sql: """
+                SELECT * FROM task WHERE completedAt IS NULL AND deletedAt IS NULL AND title LIKE ? ESCAPE '\\'
+                ORDER BY createdAt DESC, id DESC LIMIT ?
+                """, arguments: [esc + "%", limit]).map(TaskItem.init)
+            return hits.map { t in
+                var path: [String] = []; var p = t.parentID
+                while let id = p, let a = byID[id] { path.insert(a.title, at: 0); p = a.parentID }
+                return ParentMatch(task: t, path: path)
+            }
         }
     }
 
@@ -371,7 +433,7 @@ public final class TaskStore: Sendable {
         let args: StatementArguments = [start.timeIntervalSince1970, end.timeIntervalSince1970]
         let count = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM task WHERE deletedAt IS NULL AND completedAt >= ? AND completedAt < ?", arguments: args) ?? 0
         let titles = try String.fetchAll(db, sql: "SELECT title FROM task WHERE deletedAt IS NULL AND completedAt >= ? AND completedAt < ? ORDER BY completedAt DESC, id DESC LIMIT 3", arguments: args)
-        return TodaySummary(doneCount: count, latestTitles: titles)
+        return TodaySummary(doneCount: count, latestTitles: titles, openCount: try readOpenCount(db))
     }
 }
 
@@ -429,5 +491,45 @@ private extension Database {
         let list = ids.map(String.init).joined(separator: ",")
         let parents = try Row.fetchAll(self, sql: "SELECT DISTINCT parentId FROM task WHERE id IN (\(list))")
         for p in parents { let pid: Int64? = p["parentId"]; try setOrder(parent: pid, ids: try openChildren(of: pid)) }
+    }
+}
+
+// MARK: - Undo log (value-type snapshots)
+
+private struct RowState: Equatable {
+    var id: Int64, parentId: Int64?, position: Int, title: String, note: String
+    var completedAt: Double?, deletedAt: Double?
+
+    static func all(_ db: Database) throws -> [Int64: RowState] {
+        let rows = try Row.fetchAll(db, sql: "SELECT id, parentId, position, title, note, completedAt, deletedAt FROM task")
+        return Dictionary(uniqueKeysWithValues: rows.map { r in
+            (r["id"] as Int64, RowState(id: r["id"], parentId: r["parentId"], position: r["position"], title: r["title"],
+                                         note: r["note"], completedAt: r["completedAt"], deletedAt: r["deletedAt"]))
+        })
+    }
+
+    func write(_ db: Database) throws {
+        try db.execute(sql: "UPDATE task SET parentId = ?, position = ?, title = ?, note = ?, completedAt = ?, deletedAt = ? WHERE id = ?",
+                       arguments: [parentId, position, title, note, completedAt, deletedAt, id])
+    }
+}
+
+private struct UndoStep { var before: [RowState]; var after: [RowState] }
+
+/// App-wide, in-memory, 100 steps. Mutated inside the db write queue; lock guards the `canUndo` reads.
+private final class UndoLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var undo: [UndoStep] = [], redo: [UndoStep] = []
+    var canUndo: Bool { lock.withLock { !undo.isEmpty } }
+    var canRedo: Bool { lock.withLock { !redo.isEmpty } }
+    func clear() { lock.withLock { undo = []; redo = [] } }
+    func popUndo() -> UndoStep? { lock.withLock { undo.popLast() } }
+    func popRedo() -> UndoStep? { lock.withLock { redo.popLast() } }
+    /// toUndo: step goes on the undo stack (a new action, or a redo); else on the redo stack.
+    func push(_ s: UndoStep, toUndo: Bool, keepRedo: Bool) {
+        lock.withLock {
+            if toUndo { undo.append(s); if undo.count > 100 { undo.removeFirst() }; if !keepRedo { redo = [] } }
+            else { redo.append(s) }
+        }
     }
 }

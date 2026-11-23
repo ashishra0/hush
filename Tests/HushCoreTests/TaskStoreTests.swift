@@ -231,3 +231,103 @@ private func date(_ d: Int, _ h: Int, _ m: Int) -> Date { utc.date(from: DateCom
     try s.setCollapsed(a.id, true)
     #expect(try s.task(a.id).collapsed)
 }
+
+@Test func undoRedoRestoresExactPlace() throws {
+    let (s, _) = try make()
+    #expect(try s.undo().isEmpty && !s.canUndo && !s.canRedo)
+    let a = try s.create(title: "a"), b = try s.create(title: "b"), c = try s.create(title: "c")
+    let k = try s.create(title: "k", parent: b.id)
+    try s.undo()                                            // create k
+    #expect(try titles(s, b.id).isEmpty)
+    try s.redo()
+    #expect(try titles(s, b.id) == ["k"])
+    try s.indent(c.id)                                      // c -> under b after k
+    #expect(try titles(s, b.id) == ["k", "c"])
+    try s.undo()
+    #expect(try titles(s) == ["Inbox", "a", "b", "c"])
+    try s.outdent(k.id); try s.undo()
+    #expect(try titles(s, b.id) == ["k"])
+    try s.move(c.id, newParent: nil, index: 1); try s.undo()
+    #expect(try titles(s) == ["Inbox", "a", "b", "c"])
+    try s.update(a.id, title: "A", note: "n"); try s.undo()
+    #expect(try s.task(a.id).title == "a" && s.task(a.id).note == "")
+    _ = try s.moveDown(a.id); try s.undo()
+    #expect(try titles(s) == ["Inbox", "a", "b", "c"])
+}
+
+@Test func undoCompleteDeleteCascadeAndRedoClears() throws {
+    let (s, _) = try make()
+    let p = try s.create(title: "p"); let k = try s.create(title: "k", parent: p.id)
+    _ = try s.complete(p.id)
+    #expect(try titles(s) == ["Inbox"])
+    try s.undo()
+    #expect(try titles(s, p.id) == ["k"])
+    _ = try s.delete(p.id); try s.undo()
+    #expect(try titles(s, p.id) == ["k"])
+    try s.redo()
+    #expect(try titles(s) == ["Inbox"])
+    try s.undo()
+    #expect(s.canRedo)
+    try s.create(title: "new")                              // new action clears redo
+    #expect(!s.canRedo)
+    try s.setCollapsed(k.id, true)                          // not undoable
+    let n = try s.undo(); #expect(n.count == 1)
+    #expect(try s.task(k.id).collapsed)
+}
+
+@Test func undoStackCappedAt100() throws {
+    let (s, _) = try make()
+    for i in 0..<120 { try s.create(title: "t\(i)") }
+    var n = 0
+    while !(try s.undo().isEmpty) { n += 1 }
+    #expect(n == 100)
+}
+
+@Test func searchParentsPrefix() throws {
+    let (s, _) = try make()
+    let w = try s.create(title: "Work"); try s.create(title: "Workout", parent: w.id); try s.create(title: "Home")
+    let r = try s.searchParents(prefix: "wo")
+    #expect(r.map(\.task.title) == ["Workout", "Work"] && r[0].path == ["Work"])
+    #expect(try s.searchParents(prefix: " ").isEmpty && s.searchParents(prefix: "ork").isEmpty)
+    #expect(try s.searchParents(prefix: "i").map(\.task.title) == ["Inbox"])
+}
+
+@Test func todaySummaryOpenCountAndClosureCopy() throws {
+    let (s, c) = try make()
+    let t = try s.create(title: "x"); try s.create(title: "y")
+    c.t = date(20, 9, 0); _ = try s.complete(t.id)
+    let sum = try s.todaySummary(now: date(20, 10, 0), calendar: utc)
+    #expect(sum.doneCount == 1 && sum.openCount == 1 && sum.copy.headline == "One thing, done.")
+    #expect(ClosureCopy.choose(doneCount: 0, openCount: 3).headline == "A quiet day.")
+    #expect(ClosureCopy.choose(doneCount: 3, openCount: 3).headline == "Steady progress.")
+    #expect(ClosureCopy.choose(doneCount: 6, openCount: 1).headline == "A good day's work.")
+    #expect(ClosureCopy.choose(doneCount: 9, openCount: 0).headline == "All clear.")
+}
+
+@Test func randomOpsKeepOrderGapFreeAndAncestorsOpen() throws {
+    let (s, _) = try make()
+    var seed: UInt64 = 42
+    func rnd(_ n: Int) -> Int { seed = seed &* 6364136223846793005 &+ 1442695040888963407; return Int(seed >> 33) % n }
+    func flat(_ ns: [OutlineNode]) -> [OutlineNode] { ns.flatMap { [$0] + flat($0.children) } }
+    for i in 0..<300 {
+        let all = flat(try s.outline()).filter { !$0.task.isInbox }.map(\.task.id)
+        let pick = all.isEmpty ? nil : all[rnd(all.count)]
+        switch rnd(9) {
+        case 0, 1: try s.create(title: "n\(i)", parent: rnd(2) == 0 ? nil : pick)
+        case 2: if let p = pick { try? s.indent(p) }
+        case 3: if let p = pick { try? s.outdent(p) }
+        case 4: if let p = pick { try? s.moveUp(p) }
+        case 5: if let p = pick { try? s.move(p, newParent: all.isEmpty ? nil : all[rnd(all.count)], index: rnd(4)) }
+        case 6: if let p = pick, rnd(3) == 0 { _ = try s.complete(p) }
+        case 7: if let p = pick, rnd(3) == 0 { _ = try s.delete(p) }
+        default: try s.undo()
+        }
+        func check(_ ns: [OutlineNode]) {
+            #expect(ns.map(\.task.position) == Array(0..<ns.count))
+            ns.forEach { check($0.children) }
+        }
+        check(try s.outline())
+    }
+    // every open task is reachable from the outline => no open task hides under a completed/deleted ancestor
+    #expect(flat(try s.outline()).filter { !$0.task.isInbox }.count == (try s.openCount()))
+}

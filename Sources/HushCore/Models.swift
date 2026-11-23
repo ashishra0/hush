@@ -60,6 +60,34 @@ public struct TodaySummary: Hashable, Sendable {
     public let doneCount: Int
     /// Up to 3, newest first.
     public let latestTitles: [String]
+    /// All open tasks excluding Inbox.
+    public let openCount: Int
+    /// Closure card headline/closing pair per D18.
+    public var copy: ClosureCopy { ClosureCopy.choose(doneCount: doneCount, openCount: openCount) }
+}
+
+public struct ClosureCopy: Hashable, Sendable {
+    public let headline: String
+    public let closing: String
+
+    /// D18: no open tasks at all -> "All clear." pair regardless of count; else by finished-today count.
+    public static func choose(doneCount: Int, openCount: Int) -> ClosureCopy {
+        if openCount == 0 { return .init(headline: "All clear.", closing: "Nothing is waiting on you. Enjoy it.") }
+        switch doneCount {
+        case 6...: return .init(headline: "A good day's work.", closing: "The rest can wait until tomorrow.")
+        case 2...: return .init(headline: "Steady progress.", closing: "Every one of these counts.")
+        case 1: return .init(headline: "One thing, done.", closing: "Sometimes one is the right number.")
+        default: return .init(headline: "A quiet day.", closing: "Not every day is for crossing things off.")
+        }
+    }
+}
+
+/// A `/name` filing suggestion (D7).
+public struct ParentMatch: Identifiable, Hashable, Sendable {
+    public let task: TaskItem
+    /// Ancestor titles, outermost first.
+    public let path: [String]
+    public var id: TaskID { task.id }
 }
 
 /// Everything the menu bar popover shows.

@@ -34,6 +34,17 @@ Top level (`parentID == nil`) = Inbox + user projects. Quick Capture default: `c
 - `delete(id) -> DeletionReceipt` (soft, whole subtree), `undoDelete(receipt)`
 - `restore(fromHistory: id) -> TaskItem` (nearest open ancestor, else top level; appended at end; its completed descendants stay in History)
 
+## Undo / redo (D21)
+`undo()` / `redo()` -> `[TaskID]` (ids touched; empty = nothing to do, never an error), `canUndo`, `canRedo`.
+One app-wide, in-memory stack (100 steps) of row snapshots; each step restores exact parent/index. Covered: create, update (title/note), move, indent, outdent, moveUp/Down, complete (whole cascade), delete (whole subtree). A new action clears redo.
+NOT undoable: `setCollapsed`, `restore(fromHistory:)`. `restore`, `undoComplete(receipt)` and `undoDelete(receipt)` clear both stacks -- use `undo()` instead of the receipt API.
+
+## Parent search (D7)
+`searchParents(prefix:limit: 5) -> [ParentMatch { task, path }]`: open tasks (Inbox included) whose title starts with prefix, case-insensitive, newest created first. Blank prefix -> [].
+
+## Closure (D18)
+`TodaySummary` now has `openCount` and `copy: ClosureCopy { headline, closing }` (all-clear pair when no open tasks, else by doneCount: 0 / 1 / 2-5 / >=6). `ClosureCopy.choose(doneCount:openCount:)` is pure.
+
 ## Observation
 `observeOutline(root:onChange:)`, `observeMenuBar(limit:onChange:)`, `observeHistory(calendar:onChange:)`, `observeToday(calendar:onChange:)` -> `Subscription`.
 Note: `observeToday` re-reads only on DB change, not when 04:00 passes; re-subscribe or call `todaySummary` on popover open.

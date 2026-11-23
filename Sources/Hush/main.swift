@@ -1,6 +1,9 @@
 import AppKit
-import HushCore
-// Placeholder entry point. Frontend replaces this.
-let app = NSApplication.shared
-app.setActivationPolicy(.accessory)
-app.run()
+
+MainActor.assumeIsolated {
+    let app = NSApplication.shared
+    let delegate = AppDelegate()
+    app.delegate = delegate
+    app.setActivationPolicy(.accessory)
+    app.run()
+}
