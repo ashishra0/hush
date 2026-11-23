@@ -17,6 +17,7 @@ final class PopoverModel {
     var onCapture: () -> Void = {}
     var onComplete: (RecentTask) -> Void = { _ in }
     var onOpenOutline: () -> Void = {}
+    var onHistory: () -> Void = {}
     var onSettings: () -> Void = {}
     var onQuit: () -> Void = {}
 }
@@ -58,7 +59,7 @@ struct PopoverView: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(model.recent) { task in
-                        RecentRow(task: task) { model.onComplete(task) }
+                        RecentRow(task: task, complete: { model.onComplete(task) }, open: model.onOpenOutline)
                     }
                 }
                 .padding(.horizontal, Theme.s2)
@@ -68,6 +69,8 @@ struct PopoverView: View {
             VStack(spacing: 0) {
                 FooterRow(title: "Open outline", keys: "⌘O", action: model.onOpenOutline)
                     .keyboardShortcut("o", modifiers: .command)
+                FooterRow(title: "History", keys: "⌘Y", action: model.onHistory)
+                    .keyboardShortcut("y", modifiers: .command)
                 FooterRow(title: "Settings…", keys: "⌘,", action: model.onSettings)
                     .keyboardShortcut(",", modifiers: .command)
                 FooterRow(title: "Quit Hush", keys: "⌘Q", action: model.onQuit)
@@ -83,6 +86,7 @@ struct PopoverView: View {
 private struct RecentRow: View {
     let task: RecentTask
     let complete: () -> Void
+    let open: () -> Void
     @State private var hover = false
 
     var body: some View {
@@ -100,6 +104,8 @@ private struct RecentRow: View {
         .padding(.horizontal, Theme.s2)
         .frame(height: 30)
         .background(hover ? Theme.surfaceSunk : .clear, in: RoundedRectangle(cornerRadius: Theme.rRow))
+        .contentShape(Rectangle())
+        .onTapGesture(perform: open)
         .onHover { hover = $0 }
     }
 

@@ -28,19 +28,26 @@ final class HotKey {
             }, 1, &spec, nil, nil)
             handlerInstalled = true
         }
-        if let ref { UnregisterEventHotKey(ref); self.ref = nil }
-        let id = EventHotKeyID(signature: OSType(0x48555348) /* 'HUSH' */, id: 1)
-        let status = RegisterEventHotKey(keyCode, modifiers, id, GetApplicationEventTarget(), 0, &ref)
-        if status != noErr { NSLog("Hush: RegisterEventHotKey failed (\(status)); shortcut may be taken") }
+        _ = tryRegister(keyCode, modifiers)
     }
 
-    /// Rebind and persist (used by Settings).
-    func rebind(keyCode: UInt32, modifiers: UInt32) {
+    private func tryRegister(_ code: UInt32, _ mods: UInt32) -> Bool {
+        if let ref { UnregisterEventHotKey(ref); self.ref = nil }
+        let id = EventHotKeyID(signature: OSType(0x48555348) /* 'HUSH' */, id: 1)
+        let status = RegisterEventHotKey(code, mods, id, GetApplicationEventTarget(), 0, &ref)
+        if status != noErr { NSLog("Hush: RegisterEventHotKey failed (\(status)); shortcut may be taken") }
+        return status == noErr
+    }
+
+    /// Rebind and persist (used by Settings). Returns false, keeping the old shortcut, if the combination can't be registered.
+    @discardableResult
+    func rebind(keyCode: UInt32, modifiers: UInt32) -> Bool {
+        guard tryRegister(keyCode, modifiers) else { _ = tryRegister(self.keyCode, self.modifiers); return false }
         self.keyCode = keyCode
         self.modifiers = modifiers
         defaults.set(Int(keyCode), forKey: "hotkey.keyCode")
         defaults.set(Int(modifiers), forKey: "hotkey.modifiers")
-        register()
+        return true
     }
 
     func reset() {

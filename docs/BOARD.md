@@ -121,7 +121,7 @@ A task is done when its criteria pass, `swift build` is warning-free and `swift 
 - [ ] Given a zoomed node with 0 open tasks, the "All clear." block fades in after 400 ms with the node name in the copy; ↵ creates its first child in edit mode.
 - [ ] If the zoomed node is completed or deleted, the view zooms to its nearest open ancestor, else Home.
 
-**P1-10 · Frontend · Drag reorder** · deps: P1-07, P1-02 · `todo`
+**P1-10 · Frontend · Drag reorder** · deps: P1-07, P1-02 · `done`
 - [ ] Hover shows the 6-dot handle; dragging shows the lifted row, a 35% ghost at the origin and the 2px accent drop line with ring.
 - [ ] The drop line appears only at valid targets per D15; releasing moves the task and its subtree there. Esc or release on an invalid target cancels with no change.
 - [ ] A drag is one undo step (once P1-12 lands).
@@ -133,7 +133,7 @@ A task is done when its criteria pass, `swift build` is warning-free and `swift 
 - [ ] Selection ends on next sibling, else previous, else parent.
 - [ ] With Reduce Motion: instant fill and strike, 400 ms hold, 120 ms fade, single-frame reflow.
 
-**P1-12 · Frontend · Undo wiring and toast** · deps: P1-04, P1-11 · `todo`
+**P1-12 · Frontend · Undo wiring and toast** · deps: P1-04, P1-11 · `done`
 - [ ] ⌘Z / ⇧⌘Z in the outline call Core undo / redo; the restored row is selected and scrolled into view.
 - [ ] After a completion the toast "Done · <title>  ⌘Z Undo" rises 8px in 160 ms, holds 4 s, pauses while hovered, and is replaced by the next completion's toast.
 - [ ] While a title is being edited, ⌘Z undoes typing in the field only.

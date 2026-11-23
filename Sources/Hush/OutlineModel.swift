@@ -35,6 +35,15 @@ struct Ghost: Identifiable {
     var duration: Double { reduceMotion ? 520 : foldStart + 120 }
 }
 
+struct Toast: Identifiable { let id = UUID(); let title: String }
+
+/// D15 drop target: a gap between visible rows plus the depth chosen by horizontal drag.
+struct DropTarget: Equatable {
+    let gap: Int, depth: Int
+    let parent: TaskID?, index: Int
+}
+struct DragState { let id: TaskID; var dy: CGFloat; var target: DropTarget? }
+
 struct DisplayRow: Identifiable {
     let row: FlatRow
     let ghost: Ghost?
@@ -63,6 +72,9 @@ final class OutlineModel {
     var editCaretAtStart = false
     var pendingInsert: String?
     private(set) var ghosts: [Ghost] = []
+    private(set) var toast: Toast?
+    private(set) var drag: DragState?
+    @ObservationIgnored private var dragCancelled = false
 
     init(store: TaskStore) {
         self.store = store
@@ -386,11 +398,101 @@ final class OutlineModel {
         guard (try? store.complete(id)) != nil else { return }
         let g = Ghost(rows: slice, anchor: anchor, reduceMotion: Theme.reduceMotion)
         ghosts.append(g)
+        toast = Toast(title: t.title)
         selection = next
         reload()
         DispatchQueue.main.asyncAfter(deadline: .now() + (g.duration + 80) / 1000) { [weak self] in
             self?.ghosts.removeAll { $0.id == g.id }
         }
+    }
+
+    func dismissToast(_ id: UUID) { if toast?.id == id { toast = nil } }
+
+    // MARK: Undo / redo (Core owns the stack; we reselect what it touched)
+
+    func undo() { replay { try store.undo() } }
+    func redo() { replay { try store.redo() } }
+
+    private func replay(_ f: () throws -> [TaskID]) {
+        commitEditing()
+        guard let ids = try? f(), !ids.isEmpty else { return }
+        toast = nil
+        ghosts.removeAll { g in g.rows.contains { r in r.task.map { ids.contains($0.id) } ?? false } }
+        reload()
+        // Bring the first restored row into view: leave a zoom it isn't under, expand collapsed ancestors.
+        if let id = ids.first(where: { node($0) != nil }), let anc = ancestors(of: id) {
+            if let z = zoomRoot, !anc.contains(z) { zoomPath = [] }
+            for a in anc where node(a)?.task.collapsed == true { try? store.setCollapsed(a, false) }
+            reload()
+            selection = id
+        } else if let id = ids.first(where: { i in navRows.contains { $0.id == .task(i) } }) {
+            selection = id
+        }
+    }
+
+    private func ancestors(of id: TaskID) -> [TaskID]? {
+        func find(_ nodes: [OutlineNode], _ path: [TaskID]) -> [TaskID]? {
+            for n in nodes {
+                if n.id == id { return path }
+                if let f = find(n.children, path + [n.id]) { return f }
+            }
+            return nil
+        }
+        return find(tree, [])
+    }
+
+    // MARK: Drag reorder (D15)
+
+    func dragChanged(_ id: TaskID, location: CGPoint, translation: CGSize) {
+        if dragCancelled { return }
+        if drag == nil { commitEditing(); selection = id }
+        drag = DragState(id: id, dy: translation.height,
+                         target: dropTarget(id, y: location.y, dx: translation.width))
+    }
+
+    func dragEnded() {
+        defer { drag = nil; dragCancelled = false }
+        guard !dragCancelled, let d = drag, let t = d.target else { return }
+        let cur = siblings(of: d.id)
+        if cur?.parent == t.parent, cur?.list.firstIndex(where: { $0.id == d.id }) == t.index { return } // same place
+        if let p = t.parent, node(p)?.task.collapsed == true { try? store.setCollapsed(p, false) }
+        try? store.move(d.id, newParent: t.parent, index: t.index)
+        selection = d.id
+        reload()
+    }
+
+    func cancelDrag() { if drag != nil { dragCancelled = true; drag = nil } }
+
+    /// `y` is the pointer in rows space (row height 32, first row at 0); `dx` picks depth in 24pt steps.
+    private func dropTarget(_ id: TaskID, y: CGFloat, dx: CGFloat) -> DropTarget? {
+        let rows = navRows
+        guard let i = rows.firstIndex(where: { $0.id == .task(id) }) else { return nil }
+        var j = i
+        while j + 1 < rows.count, rows[j + 1].depth > rows[i].depth { j += 1 }
+        let g = min(max(Int(floor(y / Theme.rowHeight + 0.5)), 0), rows.count)
+        if g > i && g <= j { return nil }                                   // inside its own subtree
+        if g == 0, rows.first?.task?.isInbox == true { return nil }         // never above Inbox
+        var p = g - 1; if p >= i && p <= j { p = i - 1 }
+        var n = g; if n >= i && n <= j { n = j + 1 }
+        let prev = p >= 0 ? rows[p] : nil
+        let next = n < rows.count ? rows[n] : nil
+        let maxD = prev.map { $0.depth + 1 } ?? 0
+        let minD = min(next?.depth ?? 0, maxD)
+        let d = min(max(rows[i].depth + Int((dx / 24).rounded()), minD), maxD)
+
+        var parent: TaskID? = zoomRoot
+        var parentIsCollapsedPrev = false
+        if d > 0, let prev {
+            if prev.depth == d - 1 {
+                parent = prev.task?.id
+                parentIsCollapsedPrev = prev.task?.collapsed == true && prev.childCount > 0
+            } else { parent = prev.ancestors[d - 1] }
+        }
+        let sibs = (parent.flatMap(node)?.children ?? tree).filter { $0.id != id }
+        let index = parentIsCollapsedPrev ? sibs.count : sibs.filter { s in
+            rows.firstIndex { $0.id == .task(s.id) }.map { $0 < g } ?? false
+        }.count
+        return DropTarget(gap: g, depth: d, parent: parent, index: index)
     }
 
     // MARK: Keys
@@ -399,6 +501,10 @@ final class OutlineModel {
     func handle(_ k: KeyPress) -> Bool {
         let isEditing = editing != nil
         switch k.code {
+        case 53 where drag != nil:                    // Esc cancels a drag
+            cancelDrag(); return true
+        case 6 where k.cmd && !k.opt && !isEditing:   // ⌘Z / ⇧⌘Z
+            k.shift ? redo() : undo(); return true
         case 36, 76:                                  // ↵
             if k.cmd { complete(); return true }
             if isEditing { return false }

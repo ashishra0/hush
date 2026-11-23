@@ -13,7 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var outline: OutlineWindowController!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        if let id = Bundle.main.bundleIdentifier,
+        if ProcessInfo.processInfo.environment["HUSH_DB_PATH"] == nil, let id = Bundle.main.bundleIdentifier,
            NSRunningApplication.runningApplications(withBundleIdentifier: id).count > 1 {
             NSApp.terminate(nil) // a copy is already running: one menu bar item only
             return
@@ -29,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.terminate(nil)
             return
         }
+        SettingsWindowController.applyStoredAppearance()
         installMainMenu()
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -54,6 +55,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         capture.store = store
         outline = OutlineWindowController(store: store)
+        popoverModel.onHistory = { [weak self] in self?.popover.performClose(nil); self?.openHistory() }
+        popoverModel.onSettings = { [weak self] in self?.popover.performClose(nil); SettingsWindowController.shared.show() }
+        ClosureCard.onHistory = { [weak self] in self?.openHistory() }
         popoverModel.onOpenOutline = { [weak self] in self?.popover.performClose(nil); self?.outline.show() }
         HistoryWindowController.shared.onHome = { [weak self] in self?.outline.show() }
         if ProcessInfo.processInfo.environment["HUSH_OPEN_OUTLINE"] == "1" { outline.show() }
@@ -68,6 +72,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
     @objc private func openOutline() { outline.show() }
+    @objc private func openSettings() { SettingsWindowController.shared.show() }
+    @objc private func openClosure() {
+        guard let b = statusItem.button else { return }
+        NSApp.activate()
+        ClosureCard.show(relativeTo: b, store: store)
+    }
+    @objc private func menuUndo(_ sender: Any?) {
+        if outline.handlesUndo { outline.undo() } else { NSApp.sendAction(Selector(("undo:")), to: nil, from: sender) }
+    }
+    @objc private func menuRedo(_ sender: Any?) {
+        if outline.handlesUndo { outline.redo() } else { NSApp.sendAction(Selector(("redo:")), to: nil, from: sender) }
+    }
     @objc private func openHistory() { HistoryWindowController.shared.show(store: store) }
 
     @objc private func togglePopover() {
@@ -90,9 +106,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             for (t, sel, key) in items { menu.addItem(withTitle: t, action: sel, keyEquivalent: key) }
         }
         add("Hush", [("Open Outline", #selector(openOutline), "o"), ("History", #selector(openHistory), "y"),
+                     ("Today", #selector(openClosure), "d"), ("Settings…", #selector(openSettings), ","),
                      ("Close Window", #selector(NSWindow.performClose(_:)), "w"),
                      ("Quit Hush", #selector(NSApplication.terminate(_:)), "q")])
-        add("Edit", [("Undo", Selector(("undo:")), "z"), ("Redo", Selector(("redo:")), "Z"),
+        add("Edit", [("Undo", #selector(menuUndo), "z"), ("Redo", #selector(menuRedo), "Z"),
                      ("Cut", #selector(NSText.cut(_:)), "x"), ("Copy", #selector(NSText.copy(_:)), "c"),
                      ("Paste", #selector(NSText.paste(_:)), "v"), ("Select All", #selector(NSText.selectAll(_:)), "a")])
         NSApp.mainMenu = main

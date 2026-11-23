@@ -38,5 +38,8 @@ final class OutlineWindowController: NSObject {
         window.makeKeyAndOrderFront(nil)
     }
 
-    var isKey: Bool { window.isKeyWindow }
+    /// Undo/redo menu items go to the store when the outline is key and no row is being edited.
+    var handlesUndo: Bool { window.isKeyWindow && model.editing == nil }
+    func undo() { model.undo() }
+    func redo() { model.redo() }
 }

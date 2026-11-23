@@ -114,13 +114,9 @@ final class SettingsModel {
         }
         let hk = HotKey.shared
         if keyCode == hk.keyCode, mods == hk.modifiers { shortcutError = nil; return }
-        // Probe: can this combination be registered at all? (HotKey.rebind doesn't report failure.)
-        var probe: EventHotKeyRef?
-        let st = RegisterEventHotKey(keyCode, mods, EventHotKeyID(signature: OSType(0x48555350), id: 2),
-                                     GetApplicationEventTarget(), 0, &probe)
-        guard st == noErr else { shortcutError = "That shortcut is already taken. Try another."; return }
-        if let probe { UnregisterEventHotKey(probe) }
-        hk.rebind(keyCode: keyCode, modifiers: mods)
+        guard hk.rebind(keyCode: keyCode, modifiers: mods) else {
+            shortcutError = "That shortcut is already taken. Try another."; return
+        }
         shortcut = hk.display
         shortcutError = nil
     }

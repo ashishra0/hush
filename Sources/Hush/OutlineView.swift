@@ -20,6 +20,9 @@ struct OutlineView: View {
                     if let s { proxy.scrollTo(DisplayRow.key(.task(s))) }
                 }
             }
+            .overlay(alignment: .bottom) {
+                if let t = model.toast { ToastView(toast: t, model: model).id(t.id).padding(.bottom, Theme.s4) }
+            }
             Rectangle().fill(Theme.hairline).frame(height: 1)
             hintBar
         }
@@ -70,9 +73,30 @@ struct OutlineView: View {
                     }
                 }
             }
+            .coordinateSpace(name: "rows")
+            .overlay(alignment: .topLeading) { dragOverlay }
 
             if model.openCount == 0 && model.draft == nil { EmptyState(name: model.title).id(model.zoomPath) }
             Color.clear.frame(height: 64)
+        }
+    }
+
+    /// Lifted row (white, hairline, shadow) and the 2px accent drop line with a 6px ring (D15 target).
+    @ViewBuilder private var dragOverlay: some View {
+        if let d = model.drag, let i = model.realRows.firstIndex(where: { $0.id == .task(d.id) }) {
+            let row = model.realRows[i]
+            RowView(row: row, model: model, branch: [], lifted: true)
+                .offset(y: CGFloat(i) * Theme.rowHeight + d.dy)
+                .allowsHitTesting(false)
+            if let t = d.target {
+                HStack(spacing: 0) {
+                    Circle().strokeBorder(Theme.accent, lineWidth: 2).frame(width: 6, height: 6)
+                    Rectangle().fill(Theme.accent).frame(height: 2)
+                }
+                .padding(.leading, 8 + 24 * CGFloat(t.depth))
+                .offset(y: CGFloat(t.gap) * Theme.rowHeight - 3)
+                .allowsHitTesting(false)
+            }
         }
     }
 
@@ -80,6 +104,7 @@ struct OutlineView: View {
 
     private var hintBar: some View {
         HStack(spacing: Theme.s4) {
+            Spacer()
             ForEach([("⇥", "Indent"), ("⇧⇥", "Outdent"), ("⌘↵", "Complete"), ("⌘.", "Collapse"),
                      ("⌥⌘↑↓", "Move"), ("⌘]", "Zoom in")], id: \.0) { key, label in
                 HStack(spacing: 6) {
@@ -140,12 +165,14 @@ struct RowView: View {
     let model: OutlineModel
     let branch: Set<TaskID>
     var anim: RowAnim? = nil
+    var lifted = false
     @State private var hover = false
 
+    private var dragging: Bool { model.drag?.id == row.task?.id && !lifted }
     private var isDraft: Bool { row.task == nil }
-    private var selected: Bool { anim == nil && !isDraft && model.selection == row.task?.id }
+    private var selected: Bool { anim == nil && !lifted && !isDraft && model.selection == row.task?.id }
     private var editingMe: Bool {
-        anim == nil && model.editing == (isDraft ? .draft : .task(row.task!.id))
+        anim == nil && !lifted && model.editing == (isDraft ? .draft : .task(row.task!.id))
     }
 
     var body: some View {
@@ -160,17 +187,38 @@ struct RowView: View {
             if let t = row.task, t.collapsed, row.childCount > 0, anim == nil {
                 Text("\(row.descendantCount)").font(Theme.captionFont).foregroundStyle(Theme.inkFaint)
             }
+            if let t = row.task, !t.isInbox, anim == nil, !lifted { handle(t.id) }
         }
         .padding(.horizontal, 8)
         .frame(height: Theme.rowHeight)
-        .background(selected || editingMe ? Theme.accentWash : hover ? Theme.surfaceSunk : .clear,
+        .background(lifted ? Theme.surface : selected || editingMe ? Theme.accentWash : hover ? Theme.surfaceSunk : .clear,
                     in: RoundedRectangle(cornerRadius: Theme.rRow))
-        .overlay(alignment: .leading) { guides }
+        .overlay(RoundedRectangle(cornerRadius: Theme.rRow).strokeBorder(lifted ? Theme.hairline : .clear, lineWidth: 1))
+        .shadow(color: .black.opacity(lifted ? 0.18 : 0), radius: 12, y: 6)
+        .overlay(alignment: .leading) { if !lifted { guides } }
+        .opacity(dragging ? 0.35 : 1)
         .contentShape(Rectangle())
         .onTapGesture { if let id = row.task?.id { model.click(id) } }
         .onHover { hover = $0 }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(row.task?.title ?? "New task")
+    }
+
+    /// 6-dot grip, visible on hover; drags the row (D15). Stays hit-testable while hidden so a drag survives leaving the row.
+    private func handle(_ id: TaskID) -> some View {
+        VStack(spacing: 2) {
+            ForEach(0..<3, id: \.self) { _ in
+                HStack(spacing: 2) { Circle().frame(width: 2.5, height: 2.5); Circle().frame(width: 2.5, height: 2.5) }
+            }
+        }
+        .foregroundStyle(Theme.inkFaint)
+        .frame(width: 16, height: 24)
+        .contentShape(Rectangle())
+        .opacity(hover || dragging ? 1 : 0)
+        .gesture(DragGesture(minimumDistance: 3, coordinateSpace: .named("rows"))
+            .onChanged { model.dragChanged(id, location: $0.location, translation: $0.translation) }
+            .onEnded { _ in model.dragEnded() })
+        .accessibilityHidden(true)
     }
 
     /// 1px hairline through each ancestor's chevron centre; accent on the selection's branch.
@@ -241,6 +289,38 @@ struct RowView: View {
                     }
                 }
             }
+        }
+    }
+}
+
+struct ToastView: View {
+    let toast: Toast
+    let model: OutlineModel
+    @State private var hover = false
+    @State private var shown = false
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text("Done · \(toast.title)").lineLimit(1)
+            Text("⌘Z Undo").font(Theme.keycapFont).opacity(0.6)
+        }
+        .font(Theme.bodyFont)
+        .foregroundStyle(Theme.surface)
+        .padding(.horizontal, Theme.s4).padding(.vertical, 10)
+        .background(Theme.ink, in: Capsule())
+        .shadow(color: .black.opacity(0.2), radius: 12, y: 6)
+        .offset(y: shown || Theme.reduceMotion ? 0 : 8)   // rise 8px / 160ms; opacity only with Reduce Motion
+        .opacity(shown ? 1 : 0)
+        .onHover { hover = $0 }
+        .onAppear { withAnimation(.easeOut(duration: 0.16)) { shown = true } }
+        .task {  // holds 4s, paused while hovered
+            var left = 4.0
+            while left > 0 {
+                try? await Task.sleep(for: .milliseconds(100))
+                if Task.isCancelled { return }
+                if !hover { left -= 0.1 }
+            }
+            model.dismissToast(toast.id)
         }
     }
 }
