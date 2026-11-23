@@ -24,8 +24,8 @@ A task is done when its criteria pass, `swift build` is warning-free and `swift 
 - [ ] Given an existing DB, when the store opens again, then no second Inbox is created and existing tasks are unchanged.
 - [ ] Completing, deleting, renaming or moving Inbox fails with a typed error and changes nothing.
 
-**P0-03 · Backend · Create, list, complete, observe** · deps: P0-02 · `todo`
-- [ ] Create with a title and no parent puts the task at the end of Inbox's children. Create with a parent puts it at the end of that parent's children.
+**P0-03 · Backend · Create, list, complete, observe** · deps: P0-02 · `done`
+- [x] Create with a parent puts it at the end of that parent's children; `parent: nil` creates a top-level project (Team Lead decision — capture passes `inbox().id` explicitly).
 - [ ] Titles are validated per decision D12; invalid titles fail with a typed error and write nothing.
 - [ ] Complete sets completedAt; the task no longer appears in the open list or the open count.
 - [ ] The open list returns tasks in sibling order with depth or parent links, Inbox first.

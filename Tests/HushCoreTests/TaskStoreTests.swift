@@ -1,0 +1,233 @@
+import Foundation
+import Testing
+@testable import HushCore
+
+final class Clock: @unchecked Sendable {
+    var t = Date(timeIntervalSince1970: 1_700_000_000)
+    func tick(_ s: TimeInterval = 1) { t += s }
+}
+
+private func make() throws -> (TaskStore, Clock) {
+    let c = Clock()
+    return (try TaskStore.inMemory(now: { c.t }), c)
+}
+private func titles(_ s: TaskStore, _ root: TaskID? = nil) throws -> [String] { try s.outline(root: root).map(\.task.title) }
+
+private var utc: Calendar { var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "UTC")!; return c }
+private func date(_ d: Int, _ h: Int, _ m: Int) -> Date { utc.date(from: DateComponents(year: 2026, month: 11, day: d, hour: h, minute: m))! }
+
+@Test func inboxExistsAndIsProtected() throws {
+    let (s, _) = try make()
+    let inbox = try s.inbox()
+    #expect(inbox.isInbox && inbox.title == "Inbox" && inbox.parentID == nil)
+    #expect(throws: HushError.inboxProtected) { try s.complete(inbox.id) }
+    #expect(throws: HushError.inboxProtected) { try s.delete(inbox.id) }
+    #expect(throws: HushError.inboxProtected) { try s.update(inbox.id, title: "x") }
+    #expect(throws: HushError.inboxProtected) { try s.move(inbox.id, newParent: nil) }
+    #expect(throws: HushError.inboxProtected) { try s.outdent(inbox.id) }
+    #expect(try s.openCount() == 0)
+    #expect(try s.recent(limit: 5).isEmpty)
+}
+
+@Test func createOrdersAndInsertsAfter() throws {
+    let (s, _) = try make()
+    let a = try s.create(title: "a"), b = try s.create(title: "b")
+    try s.create(title: "mid", after: a.id)
+    #expect(try titles(s) == ["Inbox", "a", "mid", "b"])
+    #expect(try s.outline().map(\.task.position) == [0, 1, 2, 3])
+    _ = b
+}
+
+@Test func indentOutdentEdges() throws {
+    let (s, _) = try make()
+    let a = try s.create(title: "a"), b = try s.create(title: "b")
+    #expect(throws: HushError.cannotIndent) { try s.indent(try s.inbox().id) }
+    try s.indent(b.id)
+    #expect(try titles(s, a.id) == ["b"])
+    try s.outdent(b.id)
+    #expect(try titles(s) == ["Inbox", "a", "b"])
+    #expect(throws: HushError.cannotOutdent) { try s.outdent(a.id) }
+    let c = try s.create(title: "c", parent: a.id)
+    #expect(throws: HushError.cannotIndent) { try s.indent(c.id) }
+}
+
+@Test func indentGoesToEndOfPreviousSibling() throws {
+    let (s, _) = try make()
+    let a = try s.create(title: "a"), b = try s.create(title: "b")
+    try s.create(title: "a1", parent: a.id)
+    try s.indent(b.id)
+    #expect(try titles(s, a.id) == ["a1", "b"])
+}
+
+@Test func moveUpDownAndMove() throws {
+    let (s, _) = try make()
+    let a = try s.create(title: "a"), b = try s.create(title: "b"), c = try s.create(title: "c")
+    #expect(try s.moveUp(c.id))
+    #expect(try titles(s) == ["Inbox", "a", "c", "b"])
+    #expect(try s.moveDown(b.id) == false)
+    #expect(try s.moveDown(a.id))
+    #expect(try titles(s) == ["Inbox", "c", "a", "b"])
+    try s.move(b.id, newParent: a.id)
+    try s.move(c.id, newParent: a.id, index: 0)
+    #expect(try titles(s, a.id) == ["c", "b"])
+    #expect(throws: HushError.invalidMove) { try s.move(a.id, newParent: b.id) }
+    #expect(throws: HushError.invalidMove) { try s.move(a.id, newParent: a.id) }
+}
+
+@Test func completeAndUndoWithDescendants() throws {
+    let (s, c) = try make()
+    let p = try s.create(title: "p")
+    let k1 = try s.create(title: "k1", parent: p.id), k2 = try s.create(title: "k2", parent: p.id)
+    c.tick(); _ = try s.complete(k1.id)         // earlier completion, must survive undo of parent
+    c.tick()
+    let r = try s.complete(p.id)
+    #expect(Set(r.ids) == [p.id, k2.id])
+    #expect(try titles(s) == ["Inbox"])
+    #expect(try s.openCount() == 0)
+    try s.undoComplete(r)
+    #expect(try titles(s, p.id) == ["k2"])
+    #expect(try s.task(k1.id).completedAt != nil)
+    #expect(try s.task(p.id).completedAt == nil)
+}
+
+@Test func completeHidesFromRecentAndShiftsSiblings() throws {
+    let (s, _) = try make()
+    let a = try s.create(title: "a"); try s.create(title: "b")
+    _ = try s.complete(a.id)
+    #expect(try s.recent(limit: 5).map(\.title) == ["b"])
+    #expect(try s.outline().map(\.task.position) == [0, 1])
+}
+
+@Test func deleteAndUndo() throws {
+    let (s, _) = try make()
+    let p = try s.create(title: "p"); let k = try s.create(title: "k", parent: p.id)
+    let r = try s.delete(p.id)
+    #expect(Set(r.ids) == [p.id, k.id])
+    #expect(try titles(s) == ["Inbox"])
+    #expect(throws: HushError.notFound(p.id)) { try s.task(p.id) }
+    try s.undoDelete(r)
+    #expect(try titles(s) == ["Inbox", "p"])
+    #expect(try titles(s, p.id) == ["k"])
+}
+
+@Test func restorePlacement() throws {
+    let (s, _) = try make()
+    let p = try s.create(title: "p")
+    let k = try s.create(title: "k", parent: p.id)
+    try s.create(title: "other", parent: p.id)
+    _ = try s.complete(k.id)
+    let back = try s.restore(fromHistory: k.id)
+    #expect(back.parentID == p.id)
+    #expect(try titles(s, p.id) == ["other", "k"])          // appended at end
+    // parent completed too -> nearest open ancestor (top level)
+    let g = try s.create(title: "g"), m = try s.create(title: "m", parent: g.id)
+    _ = try s.complete(m.id); _ = try s.complete(g.id)
+    #expect(try s.restore(fromHistory: m.id).parentID == nil)
+    #expect(try titles(s).last == "m")
+}
+
+@Test func historyGroupsByDayWith4amBoundary() throws {
+    let (s, c) = try make()
+    let ids = try (0..<4).map { try s.create(title: "t\($0)").id }
+    for (id, when) in zip(ids, [date(20, 3, 59), date(20, 4, 0), date(21, 3, 59), date(21, 12, 0)]) {
+        c.t = when; _ = try s.complete(id)
+    }
+    let h = try s.history(calendar: utc)
+    #expect(h.map(\.day) == [date(21, 0, 0), date(20, 0, 0), date(19, 0, 0)])
+    #expect(h.map { $0.entries.map(\.task.title) } == [["t3"], ["t2", "t1"], ["t0"]])
+}
+
+@Test func todaySummaryAndPath() throws {
+    let (s, c) = try make()
+    let w = try s.create(title: "Work")
+    let ids = try (1...4).map { try s.create(title: "d\($0)", parent: w.id).id }
+    c.t = date(20, 3, 0); _ = try s.complete(ids[0])           // previous logical day
+    for (i, id) in ids.dropFirst().enumerated() { c.t = date(20, 9 + i, 0); _ = try s.complete(id) }
+    let sum = try s.todaySummary(now: date(21, 2, 0), calendar: utc)   // still "today" (before 04:00)
+    #expect(sum.doneCount == 3 && sum.latestTitles == ["d4", "d3", "d2"])
+    #expect(try s.todaySummary(now: date(21, 5, 0), calendar: utc).doneCount == 0)
+    #expect(try s.history(calendar: utc)[0].entries[0].path == ["Work"])
+}
+
+@Test func searchEscapesAndFilters() throws {
+    let (s, _) = try make()
+    let a = try s.create(title: "100% done", note: "x"); try s.create(title: "milk")
+    #expect(try s.search("100%").map(\.id) == [a.id])
+    #expect(try s.search("MILK").count == 1)
+    _ = try s.complete(a.id)
+    #expect(try s.search("100").isEmpty)
+}
+
+@Test func freshFileDatabaseMigratesAndPersists() throws {
+    let path = NSTemporaryDirectory() + "hush-\(UUID().uuidString).sqlite"
+    defer { try? FileManager.default.removeItem(atPath: path) }
+    do { let s = try TaskStore(path: path); try s.create(title: "kept") }
+    let s2 = try TaskStore(path: path)
+    #expect(try titles(s2) == ["Inbox", "kept"])
+    #expect(try s2.outline().filter(\.task.isInbox).count == 1)
+}
+
+@Test func titleAndNoteValidation() throws {
+    let (s, _) = try make()
+    #expect(try s.create(title: "  a\nb  ").title == "a b")
+    #expect(throws: HushError.emptyTitle) { try s.create(title: " \n ") }
+    #expect(throws: HushError.titleTooLong) { try s.create(title: String(repeating: "x", count: 501)) }
+    #expect(try s.create(title: String(repeating: "x", count: 500)).title.count == 500)
+    #expect(throws: HushError.noteTooLong) { try s.create(title: "n", note: String(repeating: "x", count: 10_001)) }
+    let t = try s.create(title: "t")
+    #expect(throws: HushError.emptyTitle) { try s.update(t.id, title: "") }
+    #expect(throws: HushError.noteTooLong) { try s.update(t.id, note: String(repeating: "x", count: 10_001)) }
+    #expect(try s.update(t.id, title: " new\ntitle ").title == "new title")
+    #expect(try titles(s).last == "new title")
+}
+
+@Test func openDescendantCounts() throws {
+    let (s, _) = try make()
+    let a = try s.create(title: "a"), b = try s.create(title: "b", parent: a.id)
+    try s.create(title: "c", parent: b.id); try s.create(title: "i", parent: s.inbox().id)
+    #expect(try s.openDescendantCount() == 4)
+    #expect(try s.openDescendantCount(of: a.id) == 2)
+    #expect(try s.openDescendantCount(of: b.id) == 1)
+    let n = try s.outline().first { $0.task.id == a.id }!
+    #expect(n.openDescendantCount == 2 && n.openChildCount == 1)
+    _ = try s.complete(b.id)
+    #expect(try s.openDescendantCount(of: a.id) == 0)
+}
+
+@Test func nothingDisplacesInbox() throws {
+    let (s, _) = try make()
+    let a = try s.create(title: "a"), b = try s.create(title: "b")
+    #expect(try s.moveUp(a.id) == false)
+    try s.move(b.id, newParent: nil, index: 0)
+    #expect(try titles(s) == ["Inbox", "b", "a"])
+    let k = try s.create(title: "k", parent: a.id)
+    try s.outdent(k.id)
+    #expect(try s.outline().first?.task.isInbox == true)
+    try s.indent(a.id)                       // a goes into b, fine
+    #expect(try s.outline().first?.task.isInbox == true)
+    #expect(throws: HushError.invalidMove) { try s.move(b.id, newParent: a.id) }  // a is inside b
+}
+
+@Test func historyCappedAt500() throws {
+    let (s, c) = try make()
+    for i in 0..<510 { c.tick(); let t = try s.create(title: "t\(i)"); _ = try s.complete(t.id) }
+    let h = try s.history(calendar: utc)
+    #expect(h.reduce(0) { $0 + $1.entries.count } == 500)
+    #expect(h[0].entries[0].task.title == "t509")
+    #expect(h[0].day == utc.startOfDay(for: h[0].day))
+}
+
+@Test func restoreFallsBackThroughAncestors() throws {
+    let (s, _) = try make()
+    let g = try s.create(title: "g"), p = try s.create(title: "p", parent: g.id), k = try s.create(title: "k", parent: p.id)
+    _ = try s.complete(k.id); _ = try s.complete(p.id)         // p completed, g open
+    #expect(try s.restore(fromHistory: k.id).parentID == g.id)
+    #expect(try s.task(p.id).completedAt != nil)                // single task only
+}
+
+@Test func collapsedPersists() throws {
+    let (s, _) = try make()
+    let a = try s.create(title: "a")
+    try s.setCollapsed(a.id, true)
+    #expect(try s.task(a.id).collapsed)
+}
