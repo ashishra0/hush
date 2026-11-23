@@ -59,13 +59,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ClosureCard.onHistory = { [weak self] in self?.openHistory() }
         popoverModel.onOpenOutline = { [weak self] in self?.popover.performClose(nil); self?.outline.show() }
         HistoryWindowController.shared.onHome = { [weak self] in self?.outline.show() }
-        if ProcessInfo.processInfo.environment["HUSH_OPEN_OUTLINE"] == "1" { outline.show() }
         menuBarSub = store.observeMenuBar(limit: 5) { [popoverModel] snap in
             popoverModel.recent = snap.recent.map { RecentTask(id: $0.id.raw, title: $0.title, createdAt: $0.createdAt) }
             popoverModel.openCount = snap.openCount
         }
         HotKey.shared.handler = { [capture] in capture.toggle() }
         HotKey.shared.register()
+        DispatchQueue.main.async { [self] in openFromEnvironment() }
+    }
+
+    /// Test hook: `HUSH_OPEN=outline,settings,history,closure,capture,popover[,reflection,focus,shortcuts]`
+    /// (HUSH_OPEN_OUTLINE=1 still works). Light/dark: launch with `-appearance light|dark` (argument domain, not persisted).
+    private func openFromEnvironment() {
+        let env = ProcessInfo.processInfo.environment
+        var tokens = (env["HUSH_OPEN"] ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        if env["HUSH_OPEN_OUTLINE"] == "1" { tokens.append("outline") }
+        for t in tokens {
+            switch t {
+            case "outline": outline.show()
+            case "settings": SettingsWindowController.shared.show()
+            case "history": openHistory()
+            case "closure": openClosure()
+            case "capture": capture.show()
+            case "popover": togglePopover()
+            default: NSLog("Hush: HUSH_OPEN token not available: \(t)")
+            }
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }

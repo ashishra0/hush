@@ -23,9 +23,10 @@ final class HistoryWindowController {
             sub = store.observeHistory { [model] days in Task { @MainActor in model.days = days } }
         }
         if window == nil {
-            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 780),
+            let w = KeyedWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 780),
                              styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                              backing: .buffered, defer: false)
+            w.contentMinSize = NSSize(width: 640, height: 400)
             w.titleVisibility = .hidden
             w.titlebarAppearsTransparent = true
             w.isReleasedWhenClosed = false

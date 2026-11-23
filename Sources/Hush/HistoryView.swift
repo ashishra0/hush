@@ -12,7 +12,7 @@ struct HistorySection: Identifiable {
 
 enum HistoryLayout {
     /// Builds headers per D16 and quiet spans per D17 from the real `HistoryDay.day` dates.
-    static func sections(_ days: [HistoryDay], now: Date, calendar cal: Calendar) -> [HistorySection] {
+    static func sections(_ days: [(day: Date, entries: [HistoryEntry])], now: Date, calendar cal: Calendar) -> [HistorySection] {
         let today = cal.startOfDay(for: now.addingTimeInterval(-Double(TaskStore.dayBoundaryHour) * 3600))
         var list: [(Date, [HistoryEntry])] = days.map { ($0.day, $0.entries) }
         if list.first.map({ $0.0 < today }) ?? true { list.insert((today, []), at: 0) }
@@ -53,11 +53,21 @@ enum HistoryLayout {
 final class HistoryModel {
     var days: [HistoryDay] = []
     var selected: TaskID?
+    var query = ""
     var onRestore: (TaskID) -> Void = { _ in }
     var onHome: () -> Void = {}
     var onClose: () -> Void = {}
 
-    var flat: [HistoryEntry] { days.flatMap(\.entries) }
+    /// Days narrowed by the find field (title or parent path, case-insensitive).
+    var shown: [(day: Date, entries: [HistoryEntry])] {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return days.map { ($0.day, $0.entries) } }
+        return days.compactMap { d in
+            let m = d.entries.filter { $0.task.title.localizedCaseInsensitiveContains(q) || $0.path.joined(separator: " ").localizedCaseInsensitiveContains(q) }
+            return m.isEmpty ? nil : (d.day, m)
+        }
+    }
+    var flat: [HistoryEntry] { shown.flatMap(\.entries) }
 
     func move(_ d: Int) {
         let ids = flat.map(\.id)
@@ -78,13 +88,15 @@ final class HistoryModel {
 struct HistoryView: View {
     @Bindable var model: HistoryModel
     @FocusState private var focused: Bool
+    @FocusState private var finding: Bool
     private let cal = Calendar.current
     private static let time: DateFormatter = {
         let f = DateFormatter(); f.timeStyle = .short; f.dateStyle = .none; return f
     }()
 
     var body: some View {
-        let sections = HistoryLayout.sections(model.days, now: Date(), calendar: cal)
+        let searching = !model.query.trimmingCharacters(in: .whitespaces).isEmpty
+        let sections = searching ? HistoryLayout.sections(model.shown, now: Date(), calendar: cal).filter { !$0.entries.isEmpty } : HistoryLayout.sections(model.shown, now: Date(), calendar: cal)
         VStack(spacing: 0) {
             toolbar
             Rectangle().fill(Theme.hairline).frame(height: 1)
@@ -97,6 +109,9 @@ struct HistoryView: View {
                             Text("Kept forever, on this Mac").font(Theme.captionFont).foregroundStyle(Theme.inkFaint)
                         }
                         .padding(.bottom, Theme.s4)
+                        if searching && sections.isEmpty {
+                            Text("No finished tasks match “\(model.query)”.").font(Theme.bodyFont).foregroundStyle(Theme.inkFaint).padding(Theme.s2)
+                        }
                         ForEach(sections) { sec in
                             HStack {
                                 Text(sec.title).font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.ink)
@@ -132,6 +147,7 @@ struct HistoryView: View {
         .background {
             Button("") { model.restoreSelected() }.keyboardShortcut("r", modifiers: .command).opacity(0)
             Button("") { model.onHome() }.keyboardShortcut("[", modifiers: .command).opacity(0)
+            Button("") { finding = true }.keyboardShortcut("f", modifiers: .command).opacity(0)
         }
     }
 
@@ -141,6 +157,21 @@ struct HistoryView: View {
             Text("/").foregroundStyle(Theme.inkFaint)
             Text("History").foregroundStyle(Theme.ink)
             Spacer()
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass").font(.system(size: 11)).foregroundStyle(Theme.inkFaint)
+                TextField("", text: $model.query, prompt: Text("Find finished").foregroundColor(Theme.inkFaint))
+                    .textFieldStyle(.plain).font(Theme.captionFont).foregroundStyle(Theme.ink).tint(Theme.accent)
+                    .focused($finding)
+                    .onKeyPress(.upArrow) { model.move(-1); return .handled }
+                    .onKeyPress(.downArrow) { model.move(1); return .handled }
+                    .onKeyPress(.escape) { model.query = ""; finding = false; focused = true; return .handled }
+                    .onSubmit { finding = false; focused = true }
+                    .accessibilityLabel("Find finished")
+            }
+            .padding(.horizontal, Theme.s2).frame(width: 200, height: 26)
+            .background(Theme.surfaceSunk, in: RoundedRectangle(cornerRadius: Theme.rRow))
+            .overlay(RoundedRectangle(cornerRadius: Theme.rRow).strokeBorder(finding ? Theme.accent : .clear, lineWidth: 1))
+            .padding(.trailing, Theme.s4)
         }
         .font(Theme.bodyFont)
         .padding(.leading, 80) // clear the traffic lights
@@ -179,5 +210,9 @@ private struct HistoryRow: View {
         .background(selected ? Theme.accentWash : (hover ? Theme.surfaceSunk : .clear), in: RoundedRectangle(cornerRadius: Theme.rRow))
         .contentShape(Rectangle())
         .onHover { hover = $0 }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(entry.task.title)\(entry.path.isEmpty ? "" : ", in " + entry.path.joined(separator: " › ")), finished at \(time)")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityAction(named: "Restore", restore)
     }
 }

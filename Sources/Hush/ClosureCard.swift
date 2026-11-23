@@ -15,7 +15,7 @@ enum ClosureCard {
         popover.behavior = .transient
         popover.animates = !Theme.reduceMotion
         let host = NSHostingController(rootView: ClosureView(summary: summary, now: Date(),
-            close: { popover.close() }, history: { popover.close(); onHistory() }))
+            close: { popover.close() }, reflect: { popover.close(); ReflectionWindowController.shared.show(store: store) }, history: { popover.close(); onHistory() }))
         host.sizingOptions = [.preferredContentSize]
         popover.contentViewController = host
         NSApp.activate()
@@ -27,6 +27,7 @@ struct ClosureView: View {
     let summary: TodaySummary
     let now: Date
     let close: () -> Void
+    let reflect: () -> Void
     let history: () -> Void
     @FocusState private var focused: Bool
 
@@ -52,7 +53,7 @@ struct ClosureView: View {
             Text(summary.copy.closing).font(Theme.bodyFont.italic()).foregroundStyle(Theme.inkMute)
             Rectangle().fill(Theme.hairline).frame(height: 1)
             HStack(spacing: Theme.s4) {
-                Spacer(); hint("⌘Y", "History")
+                hint("↵", "Reflect"); Spacer(); hint("⌘Y", "History")
             }
         }
         .padding(Theme.s4)
@@ -62,7 +63,7 @@ struct ClosureView: View {
         .focused($focused)
         .focusEffectDisabled()
         .onAppear { focused = true }
-        .onKeyPress(.return) { close(); return .handled } // ponytail: Reflect is a later phase; ↵ just closes
+        .onKeyPress(.return) { reflect(); return .handled }
         .onKeyPress(.escape) { close(); return .handled }
         .background { Button("") { history() }.keyboardShortcut("y", modifiers: .command).opacity(0) }
     }

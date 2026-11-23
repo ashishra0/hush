@@ -4,6 +4,15 @@ import HushCore
 import ServiceManagement
 import SwiftUI
 
+/// Esc and ⌘W close, consistently across Hush windows.
+final class KeyedWindow: NSWindow {
+    override func cancelOperation(_ sender: Any?) { performClose(nil) }
+    override func performKeyEquivalent(with e: NSEvent) -> Bool {
+        if e.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command, e.charactersIgnoringModifiers == "w" { performClose(nil); return true }
+        return super.performKeyEquivalent(with: e)
+    }
+}
+
 /// Entry point: `SettingsWindowController.shared.show()` (⌘, and popover "Settings…").
 /// Call `applyStoredAppearance()` once at launch.
 @MainActor
@@ -25,9 +34,10 @@ final class SettingsWindowController {
     func show() {
         model.refresh()
         if window == nil {
-            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 10),
+            let w = KeyedWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 10),
                              styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: false)
             w.title = "Settings"
+            w.setFrameAutosaveName("HushSettings")
             w.titlebarAppearsTransparent = true
             w.isReleasedWhenClosed = false
             let host = NSHostingView(rootView: SettingsView(model: model))
@@ -50,14 +60,18 @@ final class SettingsModel {
     var launchAtLogin = false
     var launchError: String?
     var appearance = UserDefaults.standard.string(forKey: SettingsWindowController.appearanceKey) ?? "system"
+    var showMomentum = UserDefaults.standard.bool(forKey: "showMomentum") {
+        didSet { UserDefaults.standard.set(showMomentum, forKey: "showMomentum") }
+    }
     private var monitor: Any?
 
-    var dbPath: String { (try? TaskStore.defaultURL().path) ?? "Unavailable" }
+    var dbPath: String { ((try? TaskStore.defaultURL().path) as NSString?)?.abbreviatingWithTildeInPath ?? "Unavailable" }
 
     func refresh() {
         shortcut = HotKey.shared.display
         launchAtLogin = SMAppService.mainApp.status == .enabled // real state, not a stored copy
         launchError = nil
+        showMomentum = UserDefaults.standard.bool(forKey: "showMomentum")
     }
 
     func setLaunch(_ on: Bool) {
@@ -134,7 +148,6 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.s6) {
-            Text("Settings").font(.system(size: 28, weight: .light)).foregroundStyle(Theme.ink)
             row("Capture shortcut") {
                 VStack(alignment: .trailing, spacing: Theme.s1) {
                     HStack(spacing: Theme.s2) {
@@ -172,6 +185,10 @@ struct SettingsView: View {
                 }
             }
             divider
+            row("Show today's progress in the toolbar") {
+                Toggle("", isOn: $model.showMomentum).toggleStyle(.switch).labelsHidden().tint(Theme.accent)
+            }
+            divider
             VStack(alignment: .leading, spacing: Theme.s2) {
                 Text("Your tasks live on this Mac").font(Theme.bodyFont).foregroundStyle(Theme.ink)
                 Text(model.dbPath).font(Theme.keycapFont).foregroundStyle(Theme.inkMute)
@@ -179,7 +196,7 @@ struct SettingsView: View {
                 Button("Show in Finder", action: model.showInFinder).buttonStyle(.link).font(Theme.captionFont)
             }
         }
-        .padding(Theme.s6)
+        .padding(.horizontal, Theme.s6).padding(.bottom, Theme.s6).padding(.top, 52)
         .frame(width: 560, alignment: .leading)
         .background(Theme.surface)
     }

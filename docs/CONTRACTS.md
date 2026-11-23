@@ -45,6 +45,15 @@ NOT undoable: `setCollapsed`, `restore(fromHistory:)`. `delete` only soft-delete
 ## Closure (D18)
 `TodaySummary` now has `openCount` and `copy: ClosureCopy { headline, closing }` (all-clear pair when no open tasks, else by doneCount: 0 / 1 / 2-5 / >=6). `ClosureCopy.choose(doneCount:openCount:)` is pure.
 
+## M4 additions
+- `daySummary(for: Date, calendar:) -> DaySummary { day, doneCount, finished: [HistoryEntry] (newest first, title/completedAt/path), latestTitles (<=3), openCount, copy }`. `for:` is a **calendar date** (pass `HistoryDay.day` or any instant on that date): window = that date 04:00 ..< next date 04:00. For "today" use `todaySummary` or `daySummary(for: TaskStore.logicalDay(of: now))`.
+- `weekCounts(endingOn: Date, calendar:) -> [DayCount { day, count }]` (7, oldest first, last = endingOn's calendar date; pass `TaskStore.logicalDay(of: now)` for today).
+- `TaskStore.logicalDay(of: instant, calendar)` (local midnight of the 04:00-adjusted day) and `TaskStore.nextDayBoundary(after:calendar:)` (next 04:00).
+- `nextOpenTask(after: id, within: root?, skippingSubtree: false) -> TaskItem?`: next open task in outline pre-order, Inbox node itself skipped (its children included), nil at the end. Works after `id` was completed (uses its old position). Use `skippingSubtree: true` when `id` is being completed (its children complete too). Throws `.notFound` if `id` isn't under `root`.
+- `find(_ query, root: TaskID? = nil) -> [FindMatch { task, ancestors (below root, outermost first), ranges: [Range<String.Index>] in task.title }]`: open tasks, title substring, case/diacritic-insensitive, outline order. Blank -> [].
+- `findHistory(_ query, calendar:) -> [HistoryDay]` same grouping as `history`, entries filtered by title (searches all history, not just the latest 500).
+- Today's count for toolbar marks: use `observeToday` (re-reads on every DB change, using the injected clock). It does NOT fire at the 04:00 rollover by itself: Frontend should re-query `todaySummary()` when the app wakes, on `NSCalendarDayChanged`, and via one timer at `TaskStore.nextDayBoundary(after: now)`.
+
 ## Observation
 `observeOutline(root:onChange:)`, `observeMenuBar(limit:onChange:)`, `observeHistory(calendar:onChange:)`, `observeToday(calendar:onChange:)` -> `Subscription`.
 Note: `observeToday` re-reads only on DB change, not when 04:00 passes; re-subscribe or call `todaySummary` on popover open.

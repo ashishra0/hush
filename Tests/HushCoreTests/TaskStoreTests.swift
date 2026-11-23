@@ -390,3 +390,62 @@ private func nyDate(_ m: Int, _ d: Int, _ h: Int, _ min: Int = 0) -> Date {
     #expect(last?.recent.map(\.title) == ["x"])
     sub.cancel()
 }
+
+@Test func daySummaryAnyDayAndWeekCounts() throws {
+    let (s, c) = try make()
+    let w = try s.create(title: "Work")
+    let ids = try (0..<5).map { try s.create(title: "t\($0)", parent: w.id).id }
+    for (id, when) in zip(ids, [date(18, 10, 0), date(19, 3, 0), date(20, 9, 0), date(20, 15, 0), date(21, 2, 0)]) {
+        c.t = when; _ = try s.complete(id)
+    }
+    let d = try s.daySummary(for: date(20, 0, 0), calendar: utc)
+    #expect(d.day == date(20, 0, 0) && d.doneCount == 3)
+    #expect(d.finished.map(\.task.title) == ["t4", "t3", "t2"] && d.finished[0].path == ["Work"])
+    #expect(d.finished[0].task.completedAt == date(21, 2, 0) && d.latestTitles == ["t4", "t3", "t2"])
+    #expect(d.openCount == 1 && d.copy.headline == "Steady progress.")
+    #expect(try s.daySummary(for: date(25, 12, 0), calendar: utc).doneCount == 0)
+    let wk = try s.weekCounts(endingOn: date(21, 0, 0), calendar: utc)
+    #expect(wk.count == 7 && wk.first!.day == date(15, 0, 0) && wk.last!.day == date(21, 0, 0))
+    #expect(wk.map(\.count) == [0, 0, 0, 2, 0, 3, 0])
+}
+
+@Test func nextOpenTaskPreOrder() throws {
+    let (s, _) = try make()
+    let inbox = try s.inbox().id
+    let i1 = try s.create(title: "i1", parent: inbox)
+    let a = try s.create(title: "a"), a1 = try s.create(title: "a1", parent: a.id), b = try s.create(title: "b")
+    #expect(try s.nextOpenTask(after: inbox)?.id == i1.id)
+    #expect(try s.nextOpenTask(after: i1.id)?.id == a.id)
+    #expect(try s.nextOpenTask(after: a.id)?.id == a1.id)
+    #expect(try s.nextOpenTask(after: a.id, skippingSubtree: true)?.id == b.id)
+    #expect(try s.nextOpenTask(after: b.id) == nil)
+    #expect(try s.nextOpenTask(after: a1.id, within: a.id) == nil)
+    _ = try s.complete(a.id)                                           // already completed: still finds b
+    #expect(try s.nextOpenTask(after: a.id)?.id == b.id)
+    #expect(throws: HushError.notFound(i1.id)) { try s.nextOpenTask(after: i1.id, within: b.id) }
+}
+
+@Test func findWithAncestorsAndRanges() throws {
+    let (s, _) = try make()
+    let w = try s.create(title: "Work"), p = try s.create(title: "Plan Q4", parent: w.id)
+    try s.create(title: "plan the PLAN", parent: p.id); try s.create(title: "other")
+    let r = try s.find("plan")
+    #expect(r.map(\.task.title) == ["Plan Q4", "plan the PLAN"])
+    #expect(r[1].ancestors.map(\.title) == ["Work", "Plan Q4"] && r[1].ranges.count == 2)
+    #expect(String(r[1].task.title[r[1].ranges[1]]) == "PLAN")
+    #expect(try s.find("plan", root: p.id).map(\.task.title) == ["plan the PLAN"])
+    #expect(try s.find("plan", root: p.id)[0].ancestors.isEmpty && s.find("  ").isEmpty && s.find("zzz").isEmpty)
+}
+
+@Test func findHistoryAndBoundary() throws {
+    let (s, c) = try make()
+    let a = try s.create(title: "Write report"), b = try s.create(title: "call"), d = try s.create(title: "Report bug")
+    c.t = date(20, 9, 0); _ = try s.complete(a.id); _ = try s.complete(b.id)
+    c.t = date(21, 9, 0); _ = try s.complete(d.id)
+    let h = try s.findHistory("REPORT", calendar: utc)
+    #expect(h.map { $0.entries.map(\.task.title) } == [["Report bug"], ["Write report"]])
+    #expect(try s.findHistory("", calendar: utc).isEmpty)
+    #expect(TaskStore.nextDayBoundary(after: date(20, 3, 0), calendar: utc) == date(20, 4, 0))
+    #expect(TaskStore.nextDayBoundary(after: date(20, 4, 0), calendar: utc) == date(21, 4, 0))
+    #expect(TaskStore.logicalDay(of: date(20, 3, 59), utc) == date(19, 0, 0))
+}

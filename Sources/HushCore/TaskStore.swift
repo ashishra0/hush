@@ -358,6 +358,114 @@ public final class TaskStore: Sendable {
         }
     }
 
+    // MARK: M4 reads
+
+    /// Summary of any calendar day (04:00 boundary). `day` is a *calendar date* (any instant on it, e.g.
+    /// `HistoryDay.day`), not "the logical day containing this instant": midnight of Nov 20 means the
+    /// window Nov 20 04:00 ..< Nov 21 04:00. `finished` is newest first. `openCount` is the current open count.
+    public func daySummary(for day: Date, calendar: Calendar = .current) throws -> DaySummary {
+        try db.read { try Self.readDay($0, calendar.startOfDay(for: day), calendar) }
+    }
+
+    /// Finished-task counts for the 7 calendar days ending on `endingOn`'s date, oldest first.
+    /// Pass `TaskStore.logicalDay(of: now, calendar)` for "this week" so 00:00-03:59 counts as yesterday.
+    public func weekCounts(endingOn: Date, calendar: Calendar = .current) throws -> [DayCount] {
+        try db.read { db in
+            let last = calendar.startOfDay(for: endingOn)
+            return try (0..<7).map { i in
+                let d = calendar.startOfDay(for: calendar.date(byAdding: .day, value: i - 6, to: last)!)
+                let (s, e) = Self.window(d, calendar)
+                let n = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM task WHERE deletedAt IS NULL AND completedAt >= ? AND completedAt < ?",
+                                         arguments: [s.timeIntervalSince1970, e.timeIntervalSince1970]) ?? 0
+                return DayCount(day: d, count: n)
+            }
+        }
+    }
+
+    /// Local midnight of the day `instant` belongs to under the 04:00 boundary.
+    public static func logicalDay(of instant: Date, _ calendar: Calendar = .current) -> Date { dayContaining(instant, calendar) }
+
+    /// The next 04:00 strictly after `instant`: schedule one timer here to refresh "today" views.
+    public static func nextDayBoundary(after instant: Date, calendar: Calendar = .current) -> Date {
+        boundary(of: calendar.date(byAdding: .day, value: 1, to: dayContaining(instant, calendar))!, calendar)
+    }
+
+    /// Next open task after `id` in outline pre-order within `root` (nil = Home), skipping the Inbox node
+    /// itself but not its children. Works even if `id` was just completed (uses its old position).
+    /// `skippingSubtree`: ignore `id`'s own descendants (use when `id` is being completed).
+    public func nextOpenTask(after id: TaskID, within root: TaskID? = nil, skippingSubtree: Bool = false) throws -> TaskItem? {
+        try db.read { db in
+            let rows = try Row.fetchAll(db, sql: "SELECT * FROM task WHERE deletedAt IS NULL ORDER BY position, id").map(TaskItem.init)
+            let byParent = Dictionary(grouping: rows, by: { $0.parentID })
+            var order: [TaskItem] = []
+            func walk(_ p: TaskID?) { for t in byParent[p] ?? [] { order.append(t); walk(t.id) } }
+            walk(root)
+            let open = Set(try Self.readOutline(db, root: root).flatMap(Self.flatten).map(\.task.id))
+            guard let i = order.firstIndex(where: { $0.id == id }) else { throw HushError.notFound(id) }
+            let skip = skippingSubtree ? Set(try db.subtree(of: id.raw).map(TaskID.init)) : []
+            return order[(i + 1)...].first { open.contains($0.id) && !$0.isInbox && !skip.contains($0.id) }
+        }
+    }
+
+    /// Open tasks under `root` whose title contains `query` (case/diacritic-insensitive), outline order,
+    /// each with the ancestor chain below `root` and the match ranges in `task.title`.
+    public func find(_ query: String, root: TaskID? = nil) throws -> [FindMatch] {
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return [] }
+        return try db.read { db in
+            var out: [FindMatch] = []
+            func walk(_ nodes: [OutlineNode], _ chain: [TaskItem]) {
+                for n in nodes {
+                    let r = Self.ranges(of: q, in: n.task.title)
+                    if !r.isEmpty { out.append(FindMatch(task: n.task, ancestors: chain, ranges: r)) }
+                    walk(n.children, chain + [n.task])
+                }
+            }
+            walk(try Self.readOutline(db, root: root), [])
+            return out
+        }
+    }
+
+    /// History find: finished tasks whose title contains `query`, same grouping as `history`.
+    public func findHistory(_ query: String, calendar: Calendar = .current) throws -> [HistoryDay] {
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return [] }
+        return try db.read { try Self.readHistory($0, calendar: calendar, limit: Int.max) }.compactMap { d in
+            let e = d.entries.filter { !Self.ranges(of: q, in: $0.task.title).isEmpty }
+            return e.isEmpty ? nil : HistoryDay(day: d.day, entries: e)
+        }
+    }
+
+    private static func ranges(of q: String, in s: String) -> [Range<String.Index>] {
+        var out: [Range<String.Index>] = []
+        var from = s.startIndex
+        while from < s.endIndex, let r = s.range(of: q, options: [.caseInsensitive, .diacriticInsensitive], range: from..<s.endIndex) {
+            out.append(r); from = r.upperBound
+        }
+        return out
+    }
+
+    private static func flatten(_ n: OutlineNode) -> [OutlineNode] { [n] + n.children.flatMap(flatten) }
+
+    private static func window(_ day: Date, _ cal: Calendar) -> (Date, Date) {
+        (boundary(of: day, cal), boundary(of: cal.date(byAdding: .day, value: 1, to: day)!, cal))
+    }
+
+    private static func readDay(_ db: Database, _ day: Date, _ cal: Calendar) throws -> DaySummary {
+        let (s, e) = window(day, cal)
+        let all = try Row.fetchAll(db, sql: "SELECT * FROM task WHERE deletedAt IS NULL").map(TaskItem.init)
+        let byID = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
+        let done = all.filter { ($0.completedAt ?? .distantPast) >= s && ($0.completedAt ?? .distantPast) < e }
+            .sorted { ($0.completedAt!, $0.id.raw) > ($1.completedAt!, $1.id.raw) }
+        let entries = done.map { t -> HistoryEntry in
+            var path: [String] = []; var p = t.parentID
+            while let id = p, let a = byID[id] { path.insert(a.title, at: 0); p = a.parentID }
+            return HistoryEntry(task: t, path: path)
+        }
+        return DaySummary(day: day, doneCount: entries.count, finished: entries,
+                          latestTitles: entries.prefix(3).map(\.task.title), openCount: try readOpenCount(db))
+    }
+
     // MARK: Observation (callbacks delivered on the main queue)
 
     public func observeOutline(root: TaskID? = nil, onChange: @escaping @Sendable ([OutlineNode]) -> Void) -> Subscription {
@@ -394,7 +502,7 @@ public final class TaskStore: Sendable {
     }
 
     /// Local midnight of the day `t` belongs to under the 04:00 boundary.
-    static func logicalDay(of t: Date, _ cal: Calendar) -> Date {
+    static func dayContaining(_ t: Date, _ cal: Calendar) -> Date {
         let midnight = cal.startOfDay(for: t)
         return t >= boundary(of: midnight, cal) ? midnight : cal.startOfDay(for: cal.date(byAdding: .day, value: -1, to: midnight)!)
     }
@@ -429,7 +537,7 @@ public final class TaskStore: Sendable {
         }
         var days: [(Date, [HistoryEntry])] = []
         for t in done {
-            let day = Self.logicalDay(of: t.completedAt!, calendar)
+            let day = dayContaining(t.completedAt!, calendar)
             let e = HistoryEntry(task: t, path: path(t))
             if days.last?.0 == day { days[days.count - 1].1.append(e) } else { days.append((day, [e])) }
         }
@@ -437,13 +545,8 @@ public final class TaskStore: Sendable {
     }
 
     private static func readToday(_ db: Database, now: Date, calendar: Calendar) throws -> TodaySummary {
-        let day = logicalDay(of: now, calendar)
-        let start = boundary(of: day, calendar)
-        let end = boundary(of: calendar.date(byAdding: .day, value: 1, to: day)!, calendar)
-        let args: StatementArguments = [start.timeIntervalSince1970, end.timeIntervalSince1970]
-        let count = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM task WHERE deletedAt IS NULL AND completedAt >= ? AND completedAt < ?", arguments: args) ?? 0
-        let titles = try String.fetchAll(db, sql: "SELECT title FROM task WHERE deletedAt IS NULL AND completedAt >= ? AND completedAt < ? ORDER BY completedAt DESC, id DESC LIMIT 3", arguments: args)
-        return TodaySummary(doneCount: count, latestTitles: titles, openCount: try readOpenCount(db))
+        let d = try readDay(db, dayContaining(now, calendar), calendar)
+        return TodaySummary(doneCount: d.doneCount, latestTitles: d.latestTitles, openCount: d.openCount)
     }
 }
 
