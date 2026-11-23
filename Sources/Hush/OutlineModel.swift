@@ -199,11 +199,6 @@ final class OutlineModel {
         return out
     }
 
-    /// The selection and its ancestors: guides of these branches draw in accent.
-    var selectedBranch: Set<TaskID> {
-        guard let s = selection, let r = realRows.first(where: { $0.id == .task(s) }) else { return [] }
-        return Set(r.ancestors + [s])
-    }
 
     // MARK: Loading
 

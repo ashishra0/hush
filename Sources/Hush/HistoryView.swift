@@ -105,7 +105,7 @@ struct HistoryView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         HStack(alignment: .firstTextBaseline) {
-                            Text("Finished").font(.system(size: 36, weight: .light)).foregroundStyle(Theme.ink)
+                            Text("Finished").font(.geist(size: 36, weight: .semibold)).foregroundStyle(Theme.ink)
                             Spacer()
                             Text("Kept forever, on this Mac").font(Theme.captionFont).foregroundStyle(Theme.inkFaint)
                         }
@@ -115,7 +115,7 @@ struct HistoryView: View {
                         }
                         ForEach(sections) { sec in
                             HStack {
-                                Text(sec.title).font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.ink)
+                                Text(sec.title).font(.geist(size: 12, weight: .semibold)).foregroundStyle(Theme.ink)
                                 Spacer()
                                 Text(sec.right).font(Theme.captionFont).foregroundStyle(Theme.inkFaint)
                             }
@@ -161,7 +161,7 @@ struct HistoryView: View {
             Text("History").foregroundStyle(Theme.ink)
             Spacer()
             HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass").font(.system(size: 11)).foregroundStyle(Theme.inkFaint)
+                Image(systemName: "magnifyingglass").font(.geist(size: 11)).foregroundStyle(Theme.inkFaint)
                 TextField("", text: $model.query, prompt: Text("Find finished").foregroundColor(Theme.inkFaint))
                     .textFieldStyle(.plain).font(Theme.captionFont).foregroundStyle(Theme.ink).tint(Theme.accent)
                     .focused($finding).focusEffectDisabled()
@@ -193,14 +193,14 @@ private struct HistoryRow: View {
     var body: some View {
         let active = hover || selected
         HStack(spacing: Theme.s3) {
-            Image(systemName: "checkmark.circle.fill").font(.system(size: 15))
+            Image(systemName: "checkmark.circle.fill").font(.geist(size: 15))
                 .foregroundStyle(active ? Theme.inkMute : Theme.inkFaint)
             Text(entry.task.title).font(Theme.rowFont).foregroundStyle(active ? Theme.ink : Theme.inkMute).lineLimit(1)
             Spacer(minLength: Theme.s2)
             if active {
                 Button(action: restore) {
                     HStack(spacing: 6) {
-                        Image(systemName: "arrow.uturn.backward").font(.system(size: 10))
+                        Image(systemName: "arrow.uturn.backward").font(.geist(size: 10))
                         Text("Restore").font(Theme.captionFont)
                         Text("⌘R").font(Theme.keycapFont).foregroundStyle(Theme.inkFaint)
                     }

@@ -53,7 +53,7 @@ struct OutlineView: View {
 
     @ViewBuilder private var toolbar: some View {
         if model.focus != nil {
-            Text("FOCUS").font(.system(size: 11, design: .monospaced)).tracking(2.2)
+            Text("FOCUS").font(.geist(size: 11, design: .monospaced)).tracking(2.2)
                 .foregroundStyle(Theme.inkFaint)
                 .frame(maxWidth: .infinity).frame(height: 52)
         } else {
@@ -83,10 +83,9 @@ struct OutlineView: View {
 
     private var column: some View {
         let rows = model.displayRows
-        let branch = model.selectedBranch
         return VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
-                Text(model.title).font(.system(size: 36, weight: .light)).tracking(-0.7)
+                Text(model.title).font(.geist(size: 36, weight: .semibold)).tracking(-0.7)
                     .foregroundStyle(Theme.ink).lineLimit(2).fixedSize(horizontal: false, vertical: true)
                 Spacer()
                 Text("\(model.openCount) open").font(Theme.captionFont).foregroundStyle(Theme.inkFaint)
@@ -98,7 +97,7 @@ struct OutlineView: View {
                     if d.ghost != nil {
                         GhostRowView(display: d, model: model)
                     } else {
-                        RowView(row: d.row, model: model, branch: branch).id(d.id)
+                        RowView(row: d.row, model: model).id(d.id)
                             .background(GeometryReader { g in
                                 Color.clear.preference(key: RowFramesKey.self, value: [d.id: g.frame(in: .named("rows"))])
                             })
@@ -124,7 +123,7 @@ struct OutlineView: View {
     /// Lifted row (white, hairline, shadow) and the 2px accent drop line with a 6px ring (D15 target).
     @ViewBuilder private var dragOverlay: some View {
         if let d = model.drag, let row = model.realRows.first(where: { $0.id == .task(d.id) }) {
-            RowView(row: row, model: model, branch: [], lifted: true)
+            RowView(row: row, model: model, lifted: true)
                 .offset(y: d.originY + d.dy)
                 .allowsHitTesting(false)
             if let t = d.target {
@@ -151,7 +150,7 @@ struct OutlineView: View {
             ForEach(items, id: \.0) { key, label in
                 HStack(spacing: 6) {
                     Keycap(text: key)
-                    Text(label).font(.system(size: 12.5)).foregroundStyle(Theme.inkMute)
+                    Text(label).font(.geist(size: 12.5)).foregroundStyle(Theme.inkMute)
                 }
             }
             Spacer()
@@ -170,18 +169,18 @@ struct FindField: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass").font(.system(size: 11)).foregroundStyle(Theme.inkFaint)
+            Image(systemName: "magnifyingglass").font(.geist(size: 11)).foregroundStyle(Theme.inkFaint)
             TextField("", text: Binding(get: { model.find }, set: { model.setFind($0) }),
                       prompt: Text("Find").foregroundColor(Theme.inkFaint))
-                .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Theme.ink)
+                .textFieldStyle(.plain).font(.geist(size: 13)).foregroundStyle(Theme.ink)
                 .tint(Theme.accent)
                 .focused($focused)
                 .accessibilityLabel("Find in outline")
             if model.find.isEmpty {
-                Text("⌘F").font(.system(size: 11)).foregroundStyle(Theme.inkFaint)
+                Text("⌘F").font(.geist(size: 11)).foregroundStyle(Theme.inkFaint)
             } else {
                 Button { model.clearFind() } label: {
-                    Image(systemName: "xmark.circle.fill").font(.system(size: 11)).foregroundStyle(Theme.inkFaint)
+                    Image(systemName: "xmark.circle.fill").font(.geist(size: 11)).foregroundStyle(Theme.inkFaint)
                 }
                 .buttonStyle(.plain).accessibilityLabel("Clear find")
             }
@@ -279,7 +278,7 @@ struct GhostRowView: View {
                 let e = ease(clamp((t - g.foldStart) / 120))
                 height = 1 - e; opacity = 1 - e; dx = 6 * e
             }
-            return RowView(row: display.row, model: model, branch: [], anim: a)
+            return RowView(row: display.row, model: model, anim: a)
                 .frame(height: natural * height, alignment: .top)
                 .clipped()
                 .opacity(opacity)
@@ -291,7 +290,6 @@ struct GhostRowView: View {
 struct RowView: View {
     let row: FlatRow
     let model: OutlineModel
-    let branch: Set<TaskID>
     var anim: RowAnim? = nil
     var lifted = false
     @State private var hover = false
@@ -345,7 +343,7 @@ struct RowView: View {
         .frame(minHeight: Theme.rowHeight, alignment: .top)
         .background {
             RoundedRectangle(cornerRadius: Theme.rRow)
-                .fill(lifted ? Theme.surface : selected ? Theme.accentWash : hover && !editingMe && anim == nil ? Theme.surfaceSunk : .clear)
+                .fill(lifted ? Theme.surface : selected ? Theme.selection : hover && !editingMe && anim == nil ? Theme.hover : .clear)
                 .shadow(color: .black.opacity(lifted ? 0.18 : 0), radius: 12, y: 6)   // shadow on the shape only, never the text
         }
         .overlay(RoundedRectangle(cornerRadius: Theme.rRow).strokeBorder(lifted ? Theme.hairline : .clear, lineWidth: 1))
@@ -376,12 +374,12 @@ struct RowView: View {
         .accessibilityHidden(true)
     }
 
-    /// 1px hairline through each ancestor's chevron centre; accent on the selection's branch.
+    /// 1px hairline through each ancestor's chevron centre (neutral always: an accent branch read as a stray blue bar).
     private var guides: some View {
         ZStack(alignment: .leading) {
             ForEach(Array(row.ancestors.enumerated()), id: \.offset) { k, a in
                 Rectangle()
-                    .fill(branch.contains(a) ? Theme.accent : Theme.hairline)
+                    .fill(Theme.hairline)
                     .frame(width: 1)
                     .offset(x: 8 + 24 * CGFloat(k) + 8 - 0.5)
             }
@@ -392,7 +390,7 @@ struct RowView: View {
         if let t = row.task, row.childCount > 0, anim == nil, !lifted {
             Button { model.toggleCollapse(t.id) } label: {
                 Image(systemName: t.collapsed ? "chevron.right" : "chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(.geist(size: 9, weight: .semibold))
                     .foregroundStyle(Theme.inkFaint)
                     .frame(width: 16, height: 22).contentShape(Rectangle())
             }
@@ -403,13 +401,13 @@ struct RowView: View {
 
     @ViewBuilder private var marker: some View {
         if row.task?.isInbox == true {
-            Image(systemName: "folder").font(.system(size: 13)).foregroundStyle(selected ? Theme.accent : Theme.inkMute)
+            Image(systemName: "folder").font(.geist(size: 13)).foregroundStyle(selected ? Theme.ink : Theme.inkMute)
                 .frame(height: 22)
         } else if isDraft {
             DashedCircle().frame(width: 16, height: 22)
         } else {
             let circle = ZStack {
-                Circle().strokeBorder(selected ? Theme.accent : Theme.inkFaint, lineWidth: 1.5)
+                Circle().strokeBorder(selected ? Theme.inkMute : Theme.inkFaint, lineWidth: 1.5)
                 if let a = anim {
                     Circle().fill(Theme.accent).opacity(a.fill * (1 - a.fade))
                     Circle().fill(Theme.inkFaint).opacity(a.fill * a.fade)
@@ -440,6 +438,7 @@ struct RowView: View {
             .font(Theme.rowFont)
             .lineSpacing(0)
             .fixedSize(horizontal: false, vertical: true)       // wrap; the row grows in 22pt steps
+            .frame(minHeight: 22)                               // centre a single line on the 16pt circle
             .overlay(alignment: .leading) {
                 if a.strike > 0 {
                     GeometryReader { g in
@@ -499,7 +498,7 @@ struct ToastView: View {
             (Text("Done").fontWeight(.medium) + Text(" · \(toast.title)").foregroundColor(Theme.surface.opacity(0.6)))
                 .lineLimit(1)
             HStack(spacing: 6) {
-                Text("⌘Z").font(.system(size: 11)).padding(.horizontal, 5).frame(height: 18)
+                Text("⌘Z").font(.geist(size: 11)).padding(.horizontal, 5).frame(height: 18)
                     .background(Theme.surface.opacity(0.14), in: RoundedRectangle(cornerRadius: 4))
                 Text("Undo")
             }
@@ -532,8 +531,8 @@ struct EmptyState: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.s3) {
             HStack(spacing: Theme.s3) {
-                Text("All clear.").font(.system(size: 32, weight: .light)).foregroundStyle(Theme.ink)
-                Image(systemName: "checkmark.circle").font(.system(size: 24, weight: .light))
+                Text("All clear.").font(.geist(size: 32, weight: .semibold)).foregroundStyle(Theme.ink)
+                Image(systemName: "checkmark.circle").font(.geist(size: 24, ))
                     .foregroundStyle(Theme.inkFaint)
             }
             Text("Nothing in \(name) is waiting on you. Enjoy it, or press ↵ to add the next thing.")
@@ -571,7 +570,7 @@ struct FocusView: View {
                         .offset(y: motion ? 24 * (1 - rise) : 0).opacity(rise)
                 } else {
                     VStack(spacing: Theme.s2) {
-                        Text("That's everything.").font(.system(size: 24, weight: .light)).foregroundStyle(Theme.ink)
+                        Text("That's everything.").font(.geist(size: 24, )).foregroundStyle(Theme.ink)
                         Text("\(f.finished) finished in this focus session").font(Theme.captionFont)
                             .foregroundStyle(Theme.inkFaint)
                     }
@@ -628,12 +627,12 @@ struct FocusBlock: View {
                     Circle().fill(Theme.accent).opacity(fill)
                 }
                 .frame(width: 28, height: 28).padding(.top, 13)
-                Text(snap.title).font(.system(size: 44, weight: .light)).tracking(-1.1)
+                Text(snap.title).font(.geist(size: 44, weight: .semibold)).tracking(-1.1)
                     .foregroundStyle(Theme.ink)
                     .fixedSize(horizontal: false, vertical: true)
                     .overlay(alignment: .leading) {
                         if strike > 0 {
-                            Text(snap.title).font(.system(size: 44, weight: .light)).tracking(-1.1)
+                            Text(snap.title).font(.geist(size: 44, weight: .semibold)).tracking(-1.1)
                                 .strikethrough(true, color: Theme.ink).foregroundColor(.clear)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .mask(alignment: .leading) {
@@ -643,7 +642,7 @@ struct FocusBlock: View {
                     }
             }
             if !snap.note.isEmpty {
-                Text(snap.note).font(.system(size: 15)).lineSpacing(4).foregroundStyle(Theme.inkMute)
+                Text(snap.note).font(.geist(size: 15)).lineSpacing(4).foregroundStyle(Theme.inkMute)
                     .padding(.leading, 48)
             }
         }
@@ -672,7 +671,7 @@ struct ShortcutsSheet: View {
         VStack(alignment: .leading, spacing: Theme.s4) {
             ForEach(groups, id: \.0) { name, rows in
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(name.uppercased()).font(.system(size: 10, design: .monospaced)).tracking(1)
+                    Text(name.uppercased()).font(.geist(size: 10, design: .monospaced)).tracking(1)
                         .foregroundStyle(Theme.inkFaint)
                     ForEach(rows, id: \.0) { key, action in
                         HStack(spacing: Theme.s3) {
@@ -692,7 +691,7 @@ struct ShortcutsSheet: View {
             Color.black.opacity(0.25).ignoresSafeArea()
                 .onTapGesture { model.showShortcuts = false }
             VStack(alignment: .leading, spacing: Theme.s4) {
-                Text("Keyboard").font(.system(size: 20, weight: .semibold)).foregroundStyle(Theme.ink)
+                Text("Keyboard").font(.geist(size: 20, weight: .semibold)).foregroundStyle(Theme.ink)
                 ScrollView {   // sized to its content; scrolls only when the window is too short
                     list.background(GeometryReader { g in Color.clear.onAppear { listHeight = g.size.height } })
                 }
@@ -716,7 +715,7 @@ struct ShortcutsSheet: View {
 final class CaretTextView: NSTextView {
     override func drawInsertionPoint(in rect: NSRect, color: NSColor, turnedOn flag: Bool) {
         var r = rect
-        let h = min(rect.height, ceil((font ?? .systemFont(ofSize: 15)).boundingRectForFont.height))
+        let h = min(rect.height, ceil((font ?? Theme.nsSans(14)).boundingRectForFont.height))
         r.origin.y += (rect.height - h) / 2
         r.size.height = h
         super.drawInsertionPoint(in: r, color: color, turnedOn: flag)
@@ -745,7 +744,7 @@ struct EditField: NSViewRepresentable {
         f.isBordered = false
         f.drawsBackground = false
         f.focusRingType = .none
-        f.font = .systemFont(ofSize: 15)
+        f.font = Theme.nsSans(14)
         f.textColor = Theme.nsInk
         f.lineBreakMode = .byWordWrapping
         f.cell?.wraps = true

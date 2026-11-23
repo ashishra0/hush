@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Design tokens from docs/DESIGN.md. Dynamic colors resolve light/dark per appearance.
+/// Vercel Geist tokens (https://vercel.com/geist): gray scale, background-100/200, blue-700. See docs/DESIGN.md. Dynamic colors resolve light/dark per appearance.
 enum Theme {
     private static func nsDyn(_ light: UInt32, _ dark: UInt32) -> NSColor {
         func ns(_ hex: UInt32) -> NSColor {
@@ -15,31 +15,34 @@ enum Theme {
     private static func dyn(_ light: UInt32, _ dark: UInt32) -> Color { Color(nsColor: nsDyn(light, dark)) }
 
     // AppKit-side (text fields, caret) equivalents.
-    static let nsInk = nsDyn(0x1C1C1E, 0xF2F2F3)
-    static let nsAccent = nsDyn(0x0852FF, 0x3D7BFF)
+    static let nsInk = nsDyn(0x171717, 0xEDEDED)
+    static let nsAccent = nsDyn(0x0070F3, 0x0070F3)
+    static func nsSans(_ size: CGFloat) -> NSFont { NSFont(name: "Geist", size: size) ?? .systemFont(ofSize: size) }
 
-    /// Popover body (a hair off the surface so the white capture field reads as a field).
-    static let popover = dyn(0xFAFAFA, 0x161618)
-    static let ground = dyn(0xEBEBEB, 0x0B0B0C)
-    static let surface = dyn(0xFFFFFF, 0x1A1A1C)
-    static let surfaceSunk = dyn(0xF5F5F6, 0x232326)
-    static let hairline = dyn(0xDCDCDF, 0x2E2E32)
-    static let ink = dyn(0x1C1C1E, 0xF2F2F3)
-    static let inkMute = dyn(0x6E6E73, 0x8E8E93)
-    static let inkFaint = dyn(0xA1A1A6, 0x5A5A5F)
-    /// ONLY caret, focus ring, selection, drop line, completion fill.
-    static let accent = dyn(0x0852FF, 0x3D7BFF)
-    static let accentWash = dyn(0xE8EEFF, 0x14224A)
+    /// background-200: popover body, so the background-100 capture field reads as a field.
+    static let popover = dyn(0xFAFAFA, 0x000000)
+    static let ground = dyn(0xFAFAFA, 0x000000)        // background-200
+    static let surface = dyn(0xFFFFFF, 0x0A0A0A)       // background-100
+    static let surfaceSunk = dyn(0xF2F2F2, 0x1A1A1A)   // gray-100: hover, keycap fill
+    static let selection = dyn(0xF2F2F2, 0x1A1A1A)     // gray-100: the one selected row (neutral, Geist-style)
+    static let hover = dyn(0xFAFAFA, 0x111111)         // lighter than selection so the two never read alike
+    static let hairline = dyn(0xEBEBEB, 0x2E2E2E)      // gray-400 (alpha-equivalent on bg-100)
+    static let ink = dyn(0x171717, 0xEDEDED)           // gray-1000
+    static let inkMute = dyn(0x666666, 0xA1A1A1)       // gray-900
+    static let inkFaint = dyn(0xA1A1A1, 0x6E6E6E)      // placeholder, done, counts
+    /// blue-700. ONLY caret, focus ring, drop line, completion fill.
+    static let accent = dyn(0x0070F3, 0x0070F3)
+    static let accentWash = selection
 
-    static let captureFont = Font.system(size: 24, weight: .light)
-    static let rowFont = Font.system(size: 15)
-    static let bodyFont = Font.system(size: 14)
-    static let captionFont = Font.system(size: 12)
-    static let keycapFont = Font.system(size: 11, design: .monospaced)
+    static let captureFont = Font.geist(size: 22)
+    static let rowFont = Font.geist(size: 14)
+    static let bodyFont = Font.geist(size: 14)
+    static let captionFont = Font.geist(size: 12)
+    static let keycapFont = Font.geist(size: 11, design: .monospaced)
 
     // Spacing (4pt grid) and radii
     static let s1: CGFloat = 4, s2: CGFloat = 8, s3: CGFloat = 12, s4: CGFloat = 16, s6: CGFloat = 24
-    static let rKeycap: CGFloat = 4, rRow: CGFloat = 6, rPopover: CGFloat = 10, rModal: CGFloat = 14
+    static let rKeycap: CGFloat = 4, rRow: CGFloat = 6, rPopover: CGFloat = 12, rModal: CGFloat = 12
     static let rowHeight: CGFloat = 32
 
     static var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
@@ -50,12 +53,19 @@ struct Keycap: View {
     let text: String
     var body: some View {
         Text(text)
-            .font(.system(size: 12, weight: .regular))
+            .font(.geist(size: 12))
             .foregroundStyle(Theme.inkMute)
             .padding(.horizontal, 6)
             .frame(minWidth: 22, minHeight: 20)
             .background(Theme.surfaceSunk, in: RoundedRectangle(cornerRadius: Theme.rKeycap))
             .overlay(RoundedRectangle(cornerRadius: Theme.rKeycap).strokeBorder(Theme.hairline, lineWidth: 1))
             .accessibilityLabel(text)
+    }
+}
+
+extension Font {
+    /// Geist Sans / Geist Mono, bundled in Hush.app/Contents/Resources/Fonts (OFL). Falls back to system if missing.
+    static func geist(size: CGFloat, weight: Weight = .regular, design: Design = .default) -> Font {
+        .custom(design == .monospaced ? "Geist Mono" : "Geist", fixedSize: size).weight(weight)
     }
 }

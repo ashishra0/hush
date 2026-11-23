@@ -5,6 +5,10 @@ Approved direction: **A · Overcast** (Panic-inspired: gray ground, white surfac
 Pages: 1 Directions · 2 Foundations · 3 Screens (A1–A3 capture, B1 outline, C1 menu bar, D1 settings) · 4 Keyboard spec · 5 Vanishing List · 6 Daily Closure + History · 7 Focus (exploration) · 8 Closure spec + MVP scope.
 
 ## Tokens
+> **2026-11-23 — design system switched to Vercel Geist** (user request). Code (`Theme.swift`) is the source of truth:
+> background-100 #FFF/#0A0A0A (surface) · background-200 #FAFAFA/#000 (ground, popover) · gray-100 #F2F2F2/#1A1A1A (selected row, keycaps) · hover #FAFAFA/#111 · border #EBEBEB/#2E2E2E · text gray-1000 #171717/#EDEDED · secondary gray-900 #666/#A1A1A1 · faint #A1A1A1/#6E6E6E · accent blue-700 #0070F3 (caret, focus, drop line, completion fill only — never selection, never nesting guides).
+> Type: Geist Sans / Geist Mono (bundled, OFL, `Resources/Fonts`); rows copy-14; headings semibold (no light weights); radius row 6, popover/modal 12. The Overcast table below is historical.
+
 | Token | Light | Dark |
 |---|---|---|
 | ground (window bg behind outline / desktop-ish) | #EBEBEB | #0B0B0C |

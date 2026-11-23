@@ -11,6 +11,8 @@ APP=build/Hush.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
 cp "$BIN" "$APP/Contents/MacOS/Hush"
+mkdir -p "$APP/Contents/Resources"
+cp -R Resources/Fonts "$APP/Contents/Resources/Fonts"   # Geist Sans/Mono (OFL), loaded via ATSApplicationFontsPath
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -27,6 +29,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSUIElement</key><true/>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>NSHighResolutionCapable</key><true/>
+  <key>ATSApplicationFontsPath</key><string>Fonts</string>
 </dict>
 </plist>
 PLIST

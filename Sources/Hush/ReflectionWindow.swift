@@ -69,29 +69,29 @@ struct ReflectionView: View {
         ZStack(alignment: .top) {
             Dk.ground.ignoresSafeArea()
             VStack(alignment: .leading, spacing: 0) {
-                Text(label).font(.system(size: 11, design: .monospaced)).foregroundStyle(Dk.inkFaint)
-                Text(copy.headline).font(.system(size: 64, weight: .light)).tracking(-1.6).foregroundStyle(Dk.ink)
+                Text(label).font(.geist(size: 11, design: .monospaced)).foregroundStyle(Dk.inkFaint)
+                Text(copy.headline).font(.geist(size: 64, weight: .semibold)).tracking(-1.6).foregroundStyle(Dk.ink)
                     .scaleEffect(grown ? 1 : 28.0 / 64, anchor: .topLeading).padding(.top, 28)
                 Text("\(n) \(n == 1 ? "thing" : "things") finished \(offset == 0 ? "today" : "that day").")
-                    .font(.system(size: 18)).foregroundStyle(Dk.inkMute).padding(.top, 14)
+                    .font(.geist(size: 18)).foregroundStyle(Dk.inkMute).padding(.top, 14)
                 if n > 0 {
                     LazyVGrid(columns: [GridItem(.flexible(), alignment: .topLeading), GridItem(.flexible(), alignment: .topLeading)], alignment: .leading, spacing: 10) {
                         ForEach(list.prefix(12)) { e in
                             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                Text(Self.time.string(from: e.task.completedAt ?? Date())).font(.system(size: 11, design: .monospaced))
+                                Text(Self.time.string(from: e.task.completedAt ?? Date())).font(.geist(size: 11, design: .monospaced))
                                     .foregroundStyle(Dk.inkFaint).fixedSize().frame(width: 64, alignment: .leading)
-                                Text(e.task.title).font(.system(size: 14)).foregroundStyle(Dk.list).lineLimit(1)
+                                Text(e.task.title).font(.geist(size: 14)).foregroundStyle(Dk.list).lineLimit(1)
                             }
                         }
                     }
                     .padding(.top, 36)
-                    if n > 12 { Text("and \(n - 12) more").font(.system(size: 12)).foregroundStyle(Dk.inkFaint) }
+                    if n > 12 { Text("and \(n - 12) more").font(.geist(size: 12)).foregroundStyle(Dk.inkFaint) }
                 }
-                Text(copy.closing).font(.system(size: 20).italic()).foregroundStyle(Dk.ink).padding(.top, 36)
+                Text(copy.closing).font(.geist(size: 20).italic()).foregroundStyle(Dk.ink).padding(.top, 36)
                 Rectangle().fill(Dk.hairline).frame(height: 1).padding(.top, 36)
-                Text("THIS WEEK").font(.system(size: 10, design: .monospaced)).foregroundStyle(Dk.inkFaint).padding(.top, 24).padding(.bottom, 12)
+                Text("THIS WEEK").font(.geist(size: 10, design: .monospaced)).foregroundStyle(Dk.inkFaint).padding(.top, 24).padding(.bottom, 12)
                 WeekStrip(counts: week.enumerated().map { (cal.component(.weekday, from: $1.day), $1.count, $0 == week.count - 1) }, cal: cal)
-                Text("One dot per finished task. Rest days are just quiet. There are no numbers, goal lines, or comparisons.").font(.system(size: 12)).foregroundStyle(Dk.inkFaint).padding(.top, 12)
+                Text("One dot per finished task. Rest days are just quiet. There are no numbers, goal lines, or comparisons.").font(.geist(size: 12)).foregroundStyle(Dk.inkFaint).padding(.top, 12)
             }
             .id(offset)
             .transition(.opacity)
@@ -138,11 +138,11 @@ struct ReflectionView: View {
 
     private func hint(_ k: String, _ l: String) -> some View {
         HStack(spacing: 6) {
-            Text(k).font(.system(size: 11, design: .monospaced)).foregroundStyle(Dk.inkMute)
+            Text(k).font(.geist(size: 11, design: .monospaced)).foregroundStyle(Dk.inkMute)
                 .padding(.horizontal, 6).frame(minWidth: 22, minHeight: 20)
                 .background(Color(red: 0x16 / 255, green: 0x16 / 255, blue: 0x18 / 255), in: RoundedRectangle(cornerRadius: 4))
                 .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Color(red: 0x2E / 255, green: 0x2E / 255, blue: 0x32 / 255), lineWidth: 1))
-            Text(l).font(.system(size: 12)).foregroundStyle(Dk.inkFaint)
+            Text(l).font(.geist(size: 12)).foregroundStyle(Dk.inkFaint)
         }
     }
 }
@@ -161,7 +161,7 @@ struct WeekStrip: View {
                     VStack(spacing: 3) {
                         ForEach(0..<min(c.1, 12), id: \.self) { _ in Circle().fill(c.2 ? Self.dk.now : Self.dk.past).frame(width: 4, height: 4) }
                     }
-                    Text(c.2 ? "Today" : cal.shortWeekdaySymbols[c.0 - 1]).font(.system(size: 12, weight: c.2 ? .semibold : .regular))
+                    Text(c.2 ? "Today" : cal.shortWeekdaySymbols[c.0 - 1]).font(.geist(size: 12, weight: c.2 ? .semibold : .regular))
                         .foregroundStyle(c.2 ? Self.dk.now : Self.dk.past)
                 }
                 .frame(maxWidth: .infinity)

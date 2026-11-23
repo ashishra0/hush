@@ -97,7 +97,7 @@ struct CaptureView: View {
             Rectangle().fill(Theme.hairline).frame(height: 1)
             HStack(spacing: Theme.s4) {
                 Label(model.destinationName, systemImage: "folder")
-                    .font(.system(size: 13))
+                    .font(.geist(size: 13))
                     .foregroundStyle(Theme.inkMute)
                 Spacer()
                 if model.expanded { hint("⇧⇥", "Title"); hint("⌘↵", "Save", primary: true) } else { hint("⇥", "Details"); hint("↵", "Save", primary: true) }
@@ -176,7 +176,7 @@ struct CaptureView: View {
     private func hint(_ key: String, _ label: String, primary: Bool = false) -> some View {
         HStack(spacing: 8) {
             Keycap(text: key)
-            Text(label).font(.system(size: 13, weight: primary ? .medium : .regular))
+            Text(label).font(.geist(size: 13, weight: primary ? .medium : .regular))
                 .foregroundStyle(primary ? Theme.ink : Theme.inkMute)
         }
     }
@@ -187,7 +187,7 @@ struct PillView: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "checkmark")
-                .font(.system(size: 9, weight: .bold))
+                .font(.geist(size: 9, weight: .bold))
                 .foregroundStyle(.white)
                 .frame(width: 18, height: 18)
                 .background(Theme.accent, in: Circle())

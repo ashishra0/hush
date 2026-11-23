@@ -50,9 +50,9 @@ struct ClosureView: View {
     @ViewBuilder private func card(_ summary: TodaySummary) -> some View {
         let n = summary.doneCount
         VStack(alignment: .leading, spacing: 0) {
-            Text(Self.date(now)).font(.system(size: 11, design: .monospaced)).foregroundStyle(Theme.inkFaint)
-            Text(summary.copy.headline).font(.system(size: 28, weight: .light)).foregroundStyle(Theme.ink).padding(.top, Theme.s4)
-            Text("\(n) \(n == 1 ? "thing" : "things") finished today.").font(.system(size: 15)).foregroundStyle(Theme.inkMute).padding(.top, Theme.s2)
+            Text(Self.date(now)).font(.geist(size: 11, design: .monospaced)).foregroundStyle(Theme.inkFaint)
+            Text(summary.copy.headline).font(.geist(size: 28, weight: .semibold)).foregroundStyle(Theme.ink).padding(.top, Theme.s4)
+            Text("\(n) \(n == 1 ? "thing" : "things") finished today.").font(.geist(size: 15)).foregroundStyle(Theme.inkMute).padding(.top, Theme.s2)
             if n > 0 {
                 HStack(spacing: 4) {
                     ForEach(0..<min(n, 8), id: \.self) { _ in
@@ -72,7 +72,7 @@ struct ClosureView: View {
                 }
                 .padding(.top, Theme.s4)
             }
-            Text(summary.copy.closing).font(.system(size: 15).italic()).foregroundStyle(Theme.ink).padding(.top, Theme.s4)
+            Text(summary.copy.closing).font(.geist(size: 15).italic()).foregroundStyle(Theme.ink).padding(.top, Theme.s4)
             Rectangle().fill(Theme.hairline).frame(height: 1).padding(.top, Theme.s4)
             HStack(spacing: Theme.s4) {
                 hint("↵", "Reflect"); Spacer(); hint("⌘Y", "History")

@@ -28,10 +28,10 @@ struct PopoverView: View {
         VStack(spacing: 0) {
             Button(action: model.onCapture) {
                 HStack(spacing: 10) {
-                    Image(systemName: "plus").font(.system(size: 13, weight: .regular)).foregroundStyle(Theme.inkMute)
-                    Text("Capture a task…").font(.system(size: 14)).foregroundStyle(Theme.inkFaint)
+                    Image(systemName: "plus").font(.geist(size: 13, weight: .regular)).foregroundStyle(Theme.inkMute)
+                    Text("Capture a task…").font(.geist(size: 14)).foregroundStyle(Theme.inkFaint)
                     Spacer()
-                    Text(model.shortcut).font(.system(size: 12)).foregroundStyle(Theme.inkFaint)
+                    Text(model.shortcut).font(.geist(size: 12)).foregroundStyle(Theme.inkFaint)
                 }
                 .padding(.horizontal, Theme.s3)
                 .frame(height: 36)
@@ -43,9 +43,9 @@ struct PopoverView: View {
             .padding(Theme.s3)
 
             HStack {
-                Text("RECENT").font(.system(size: 11)).tracking(1.1)
+                Text("RECENT").font(.geist(size: 11)).tracking(1.1)
                 Spacer()
-                if model.openCount > 0 { Text("\(model.recent.count) of \(model.openCount) open").font(.system(size: 12.5)) }
+                if model.openCount > 0 { Text("\(model.recent.count) of \(model.openCount) open").font(.geist(size: 12.5)) }
             }
             .foregroundStyle(Theme.inkFaint)
             .padding(.horizontal, Theme.s4 + 2)
@@ -95,9 +95,9 @@ private struct RecentRow: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Complete \(task.title)")
-            Text(task.title).font(.system(size: 14)).foregroundStyle(Theme.ink).lineLimit(1)
+            Text(task.title).font(.geist(size: 14)).foregroundStyle(Theme.ink).lineLimit(1)
             Spacer(minLength: Theme.s2)
-            Text(Self.relative(task.createdAt)).font(.system(size: 12.5)).foregroundStyle(Theme.inkFaint)
+            Text(Self.relative(task.createdAt)).font(.geist(size: 12.5)).foregroundStyle(Theme.inkFaint)
         }
         .padding(.horizontal, Theme.s2)
         .frame(height: 30)
@@ -131,7 +131,7 @@ private struct FooterRow: View {
             HStack {
                 Text(title).font(Theme.bodyFont).foregroundStyle(muted ? Theme.inkMute : Theme.ink)
                 Spacer()
-                Text(keys).font(.system(size: 12)).foregroundStyle(Theme.inkFaint)
+                Text(keys).font(.geist(size: 12)).foregroundStyle(Theme.inkFaint)
             }
             .padding(.horizontal, Theme.s3)
             .frame(height: 28)

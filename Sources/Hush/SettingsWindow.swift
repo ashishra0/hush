@@ -153,7 +153,7 @@ struct SettingsView: View {
                     HStack(spacing: Theme.s2) {
                         Button(action: model.toggleRecording) {
                             Text(model.recording ? "Type shortcut…" : Self.spaced(model.shortcut))
-                                .font(.system(size: 14, design: .monospaced))
+                                .font(.geist(size: 14, design: .monospaced))
                                 .foregroundStyle(model.recording ? Theme.accent : Theme.ink)
                                 .padding(.horizontal, Theme.s4).frame(height: 30)
                                 .background(Theme.surfaceSunk, in: RoundedRectangle(cornerRadius: Theme.rKeycap))
@@ -161,7 +161,7 @@ struct SettingsView: View {
                                     .strokeBorder(model.recording ? Theme.accent : Theme.hairline, lineWidth: 1))
                         }.buttonStyle(.plain)
                         Button(action: model.resetShortcut) {
-                            Image(systemName: "xmark").font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.inkFaint)
+                            Image(systemName: "xmark").font(.geist(size: 10, weight: .semibold)).foregroundStyle(Theme.inkFaint)
                         }.buttonStyle(.plain).help("Reset to ⌘⇧Space")
                     }
                     if let e = model.shortcutError { Text(e).font(Theme.captionFont).foregroundStyle(Theme.inkMute) }
@@ -176,7 +176,7 @@ struct SettingsView: View {
             }
             divider
             VStack(alignment: .leading, spacing: Theme.s3) {
-                Text("Appearance").font(.system(size: 15)).foregroundStyle(Theme.ink)
+                Text("Appearance").font(.geist(size: 15)).foregroundStyle(Theme.ink)
                 HStack(spacing: Theme.s3) {
                     tile("system", "System")
                     tile("light", "Light")
@@ -190,12 +190,12 @@ struct SettingsView: View {
             divider
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Your tasks live on this Mac").font(.system(size: 15)).foregroundStyle(Theme.ink)
+                    Text("Your tasks live on this Mac").font(.geist(size: 15)).foregroundStyle(Theme.ink)
                     Text(model.dbPath).font(Theme.keycapFont).foregroundStyle(Theme.inkMute).textSelection(.enabled).lineLimit(2)
                 }
                 Spacer()
                 Button(action: model.showInFinder) {
-                    Text("Show in Finder").font(.system(size: 13)).foregroundStyle(Theme.ink)
+                    Text("Show in Finder").font(.geist(size: 13)).foregroundStyle(Theme.ink)
                         .padding(.horizontal, Theme.s3).frame(height: 28)
                         .background(Theme.surfaceSunk, in: RoundedRectangle(cornerRadius: Theme.rRow))
                         .overlay(RoundedRectangle(cornerRadius: Theme.rRow).strokeBorder(Theme.hairline, lineWidth: 1))
@@ -241,7 +241,7 @@ struct SettingsView: View {
                 .frame(height: 72)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.rPopover))
                 .overlay(RoundedRectangle(cornerRadius: Theme.rPopover).strokeBorder(on ? Theme.ink : Theme.hairline, lineWidth: on ? 2 : 1))
-                Text(label).font(.system(size: 13, weight: on ? .semibold : .regular)).foregroundStyle(on ? Theme.ink : Theme.inkFaint)
+                Text(label).font(.geist(size: 13, weight: on ? .semibold : .regular)).foregroundStyle(on ? Theme.ink : Theme.inkFaint)
             }
         }
         .buttonStyle(.plain).frame(maxWidth: .infinity)
@@ -253,8 +253,8 @@ struct SettingsView: View {
     private func row<C: View>(_ label: String, _ sub: String? = nil, @ViewBuilder _ content: () -> C) -> some View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(label).font(.system(size: 15)).foregroundStyle(Theme.ink)
-                if let sub { Text(sub).font(.system(size: 13)).foregroundStyle(Theme.inkFaint) }
+                Text(label).font(.geist(size: 15)).foregroundStyle(Theme.ink)
+                if let sub { Text(sub).font(.geist(size: 13)).foregroundStyle(Theme.inkFaint) }
             }
             Spacer()
             content()
