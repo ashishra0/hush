@@ -1,7 +1,7 @@
 # Hush — Board (PM)
 
 Source of truth for UI: `docs/DESIGN.md`. Ownership and tech decisions: `docs/ARCHITECTURE.md`. API: `docs/CONTRACTS.md` (Backend).
-Status values: `todo` · `doing` · `review` · `done`. Engineers update their own task's status; only PM edits scope and acceptance criteria.
+Status after the PM acceptance review of c34774a: `done` = criteria met in code and tests (may carry a minor finding) · `review` = built, needs the manual check named on the task line · `todo` = missing or has a blocker. A ticked box is confirmed by code, tests or the Team Lead's runtime check; an unticked box is waiting on the manual script or a finding. Only PM edits scope and acceptance criteria.
 A task is done when its criteria pass, `swift build` is warning-free and `swift test` is green. BE criteria are proven by Swift Testing tests on an in-memory DB; FE criteria by running `build/Hush.app`.
 
 ## Milestones
@@ -9,52 +9,52 @@ A task is done when its criteria pass, `swift build` is warning-free and `swift 
 |---|---|---|
 | **M1 = P0** | App shell, menu bar item + popover, global ⌘⇧Space, Quick Capture (title only), SQLite persistence, create / list / complete | Capture a task from any app, see it in the popover and outline, complete it, quit, relaunch: state is intact. |
 | **M2 = P1** | Nested outline, keyboard nav and editing, reorder incl. drag, Strike & Fold, undo, History, capture Details / `/name` / draft / ⌥↵ | Every outline shortcut in DESIGN "Keyboard" works without the mouse, except ⌘F and ⌘D (M3). |
-| **M3 = P2** | Daily Closure card, Settings, Find | Design screens C and D and the closure card are complete. |
+| **M3 = P2** | Daily Closure card, Settings (Find deferred, D25) | Design screens C and D and the closure card are complete. |
 | Explore later, **not scheduled** | Focus Mode, Quiet Momentum | — |
 
 ## M1 — P0
 
 **P0-01 · Backend · Contract v1** · deps: none · `done`
-- [ ] `docs/CONTRACTS.md` lists the public types and signatures for: open the store (file or in-memory), create task, complete task, list open tasks as a tree, observe changes, open-task count.
-- [ ] The task type already carries parent, sibling order, note, collapsed, createdAt, completedAt, deletedAt, so P1 adds no breaking change.
-- [ ] The signatures compile in `HushCore` (bodies may be unimplemented) so Frontend can build against them. Ship this before P0-02.
+- [x] `docs/CONTRACTS.md` lists the public types and signatures for: open the store (file or in-memory), create task, complete task, list open tasks as a tree, observe changes, open-task count.
+- [x] The task type already carries parent, sibling order, note, collapsed, createdAt, completedAt, deletedAt, so P1 adds no breaking change.
+- [x] The signatures compile in `HushCore` (bodies may be unimplemented) so Frontend can build against them. Ship this before P0-02.
 
 **P0-02 · Backend · Schema, migrations, Inbox seed** · deps: P0-01 · `done`
-- [ ] Given no DB file, when the store opens, then the file is created at the ARCHITECTURE path and contains exactly one task: root-level "Inbox".
-- [ ] Given an existing DB, when the store opens again, then no second Inbox is created and existing tasks are unchanged.
-- [ ] Completing, deleting, renaming or moving Inbox fails with a typed error and changes nothing.
+- [x] Given no DB file, when the store opens, then the file is created at the ARCHITECTURE path and contains exactly one task: root-level "Inbox".
+- [x] Given an existing DB, when the store opens again, then no second Inbox is created and existing tasks are unchanged.
+- [x] Completing, deleting, renaming or moving Inbox fails with a typed error and changes nothing.
 
-**P0-03 · Backend · Create, list, complete, observe** · deps: P0-02 · `done`
+**P0-03 · Backend · Create, list, complete, observe** · deps: P0-02 · `review` — live update after capture (script 5–6); no observer test
 - [x] Create with a parent puts it at the end of that parent's children; `parent: nil` creates a top-level project (Team Lead decision — capture passes `inbox().id` explicitly).
-- [ ] Titles are validated per decision D12; invalid titles fail with a typed error and write nothing.
-- [ ] Complete sets completedAt; the task no longer appears in the open list or the open count.
-- [ ] The open list returns tasks in sibling order with depth or parent links, Inbox first.
+- [x] Titles are validated per decision D12; invalid titles fail with a typed error and write nothing.
+- [x] Complete sets completedAt; the task no longer appears in the open list or the open count.
+- [x] The open list returns tasks in sibling order with depth or parent links, Inbox first.
 - [ ] An observer receives a new snapshot after every create and complete, with no polling.
-- [ ] Data survives closing and reopening the store.
+- [x] Data survives closing and reopening the store.
 
-**P0-04 · Frontend · App shell and bundle** · deps: none · `todo`
-- [ ] `scripts/bundle.sh` produces `build/Hush.app` that launches by double-click.
-- [ ] No Dock icon and no app-switcher entry. The menu bar shows the template icon (14px circle outline with centre dot), legible in light and dark menu bars.
+**P0-04 · Frontend · App shell and bundle** · deps: none · `review` — second copy, ⌘Q, ⌘W (script 15)
+- [x] `scripts/bundle.sh` produces `build/Hush.app` that launches by double-click.
+- [x] No Dock icon and no app-switcher entry. The menu bar shows the template icon (14px circle outline with centre dot), legible in light and dark menu bars.
 - [ ] Launching a second copy does not create a second menu bar item.
 - [ ] ⌘Q from any Hush window or the popover quits; closing a window does not quit.
 
-**P0-05 · Frontend · Theme tokens** · deps: none · `todo`
-- [ ] Every colour, type size, radius and spacing value in DESIGN "Tokens" exists as a named token; views use tokens, never literals.
+**P0-05 · Frontend · Theme tokens** · deps: none · `review` — light mode and live appearance switch (script 14)
+- [x] Every colour, type size, radius and spacing value in DESIGN "Tokens" exists as a named token; views use tokens, never literals. (Accepted in review: a few one-off sizes are literals.)
 - [ ] Switching system appearance while the app runs updates all open Hush surfaces without relaunch.
 
-**P0-06 · Frontend · Global hotkey** · deps: P0-04 · `todo`
+**P0-06 · Frontend · Global hotkey** · deps: P0-04 · `review` — real hotkey press and toggle (script 2–3)
 - [ ] Given any app is frontmost, when ⌘⇧Space is pressed, then Quick Capture appears within 100 ms with the caret in the input.
 - [ ] Pressing ⌘⇧Space while the panel is open closes it (same as Esc).
-- [ ] If registration fails, the app still launches and capture remains reachable from the popover.
+- [x] If registration fails, the app still launches and capture remains reachable from the popover.
 
-**P0-07 · Frontend · Quick Capture panel (title only)** · deps: P0-06; P0-01 to build, P0-03 to save · `todo`
-- [ ] Panel is 640 wide, horizontally centred, top edge at about 23% of the height of the screen containing the pointer. Placeholder "What's on your mind?". Footer shows the Inbox destination left and `↵ Save` right (`⇥ Details` hidden until P1-14).
+**P0-07 · Frontend · Quick Capture panel (title only)** · deps: P0-06; P0-01 to build, P0-03 to save · `review` — save, pill, focus return, Esc, click outside (script 2–3); F3
+- [x] Panel is 640 wide, horizontally centred, top edge at about 23% of the height of the screen containing the pointer. Placeholder "What's on your mind?". Footer shows the Inbox destination left and `↵ Save` right (`⇥ Details` hidden until P1-14).
 - [ ] Given a non-empty title, when ↵ is pressed, then the task is saved to Inbox, the panel morphs to the pill "✓ Saved to **Inbox**" (180 ms in, 900 ms hold, 150 ms fade), and the previously frontmost app is frontmost again immediately.
-- [ ] Given an empty or whitespace-only title, ↵ does nothing and the panel stays open.
+- [x] Given an empty or whitespace-only title, ↵ does nothing and the panel stays open.
 - [ ] Esc or a click outside closes the panel, discards the text (draft retention is P1-14) and returns focus to the previous app.
 - [ ] With Reduce Motion on, the pill appears and disappears with opacity only.
 
-**P0-08 · Frontend · Menu bar popover** · deps: P0-04, P0-03 · `todo`
+**P0-08 · Frontend · Menu bar popover** · deps: P0-04, P0-03 · `review` — open, complete, footer keys, Esc (script 5–6); F4, F5
 - [ ] Clicking the menu bar icon opens a 320-wide popover matching DESIGN screen C; clicking outside or Esc closes it.
 - [ ] The capture row shows "Capture a task…" and the shortcut; clicking it closes the popover and opens Quick Capture.
 - [ ] RECENT shows up to 5 rows and "N of M open" per D10; rows update live when a task is captured or completed.
@@ -62,52 +62,52 @@ A task is done when its criteria pass, `swift build` is warning-free and `swift 
 - [ ] With zero open tasks the rows are replaced by one caption line "All clear." and the count is hidden.
 - [ ] Footer: Open outline ⌘O and Quit Hush ⌘Q work by click and by key while the popover is open. "Settings…" is hidden until P2-03.
 
-**P0-09 · Frontend · Outline window v0 (read and complete)** · deps: P0-03, P0-05 · `done`
-- [ ] ⌘O or "Open outline" opens one window (~1040×780, 720 content column, title "Home" 36 light, meta "N open"). Opening again focuses the existing window.
-- [ ] All open tasks appear as 32-high rows in store order, indented 24 per level; Inbox shows a folder glyph instead of a circle.
+**P0-09 · Frontend · Outline window v0 (read and complete)** · deps: P0-03, P0-05 · `review` — circle click and live capture (script 6)
+- [x] ⌘O or "Open outline" opens one window (~1040×780, 720 content column, title "Home" 36 light, meta "N open"). Opening again focuses the existing window.
+- [x] All open tasks appear as 32-high rows in store order, indented 24 per level; Inbox shows a folder glyph instead of a circle.
 - [ ] Clicking a circle completes the task; the row is removed (no animation in P0) and "N open" updates.
 - [ ] A task saved from Quick Capture appears without reopening the window.
 - [ ] No editing, creation, selection or shortcuts in this task; those are M2.
 
 ## M2 — P1
 
-**P1-01 · Backend · Contract v2** · deps: P0-03 · `todo`
-- [ ] CONTRACTS.md adds signatures for everything in P1-02 to P1-06, compiling, before any of them is implemented. Frontend sign-off recorded in the "Requests" section.
+**P1-01 · Backend · Contract v2** · deps: P0-03 · `done`
+- [x] CONTRACTS.md adds signatures for everything in P1-02 to P1-06, compiling, before any of them is implemented. Frontend sign-off recorded in the "Requests" section.
 
 **P1-02 · Backend · Tree operations** · deps: P1-01 · `done`
-- [ ] Create at a given parent and index; rename; set note; set collapsed (persisted).
-- [ ] Indent: the task becomes the last child of its previous sibling, taking its subtree; no-op with no previous sibling.
-- [ ] Outdent: the task becomes the sibling immediately after its former parent; no-op at root.
-- [ ] Move to (parent, index): rejects a move into the task's own subtree and any move that displaces Inbox from first root position.
-- [ ] After any sequence of operations, sibling orders are gap-free and unique (property-style test).
-- [ ] The subtree query for any node returns open descendants plus an open-descendant count per node.
+- [x] Create at a given parent and index; rename; set note; set collapsed (persisted).
+- [x] Indent: the task becomes the last child of its previous sibling, taking its subtree; no-op with no previous sibling.
+- [x] Outdent: the task becomes the sibling immediately after its former parent; no-op at root.
+- [x] Move to (parent, index): rejects a move into the task's own subtree and any move that displaces Inbox from first root position.
+- [x] After any sequence of operations, sibling orders are gap-free and unique (property-style test).
+- [x] The subtree query for any node returns open descendants plus an open-descendant count per node.
 
-**P1-03 · Backend · Cascade complete and soft delete** · deps: P1-02 · `done`
-- [ ] Completing a parent gives the parent and every open descendant a completedAt in one transaction.
+**P1-03 · Backend · Cascade complete and soft delete** · deps: P1-02 · `todo` — rework: F1 blocker
+- [x] Completing a parent gives the parent and every open descendant a completedAt in one transaction.
 - [ ] Delete sets deletedAt on the task and all its open descendants; deleted tasks appear in no list, count or History.
-- [ ] Invariant test: no open task ever has a completed or deleted ancestor.
+- [x] Invariant test: no open task ever has a completed or deleted ancestor.
 
-**P1-04 · Backend · Undo / redo** · deps: P1-03 · `done`
-- [ ] One undo step reverses exactly one user action: create, rename, note edit, complete (including the whole cascade), delete (whole subtree), indent, outdent, move.
-- [ ] Undo restores the task to its exact prior parent and index. Redo re-applies it. A new action clears redo.
-- [ ] The stack holds at least 50 steps, is app-wide and in-memory, and is empty after relaunch.
-- [ ] Undo and redo with an empty stack are no-ops, not errors.
+**P1-04 · Backend · Undo / redo** · deps: P1-03 · `done` — F10 minor
+- [x] One undo step reverses exactly one user action: create, rename, note edit, complete (including the whole cascade), delete (whole subtree), indent, outdent, move.
+- [x] Undo restores the task to its exact prior parent and index. Redo re-applies it. A new action clears redo.
+- [x] The stack holds at least 50 steps, is app-wide and in-memory, and is empty after relaunch.
+- [x] Undo and redo with an empty stack are no-ops, not errors.
 
-**P1-05 · Backend · History and restore** · deps: P1-03 · `done`
+**P1-05 · Backend · History and restore** · deps: P1-03 · `done` — F2 minor
 - [ ] The history query returns completed, non-deleted tasks, newest first, each with title, completedAt, parent path and local-day key using the 04:00 boundary (tests at 03:59 and 04:00, and across a DST change).
-- [ ] Restore clears completedAt on that one task and places it per D5; descendants completed with it stay in History.
-- [ ] Count of tasks finished "today" (04:00 boundary) is available.
+- [x] Restore clears completedAt on that one task and places it per D5; descendants completed with it stay in History.
+- [x] Count of tasks finished "today" (04:00 boundary) is available.
 
 **P1-06 · Backend · Parent search** · deps: P1-02 · `done`
-- [ ] Given a query string, returns open tasks whose title starts with it, case-insensitive, most recently modified first, max 5, each with its path. Empty query returns nothing.
+- [x] Given a query string, returns open tasks whose title starts with it, case-insensitive, newest created first (amended in review: there is no modified date), max 5, each with its path. Empty query returns nothing.
 
-**P1-07 · Frontend · Nested outline rendering** · deps: P0-09, P1-01 · `done`
+**P1-07 · Frontend · Nested outline rendering** · deps: P0-09, P1-01 · `review` — light mode, hover / selected / editing states (script 8, 14)
 - [ ] Row slots, chevron, hover, selected and editing states match DESIGN screen B in light and dark.
-- [ ] A collapsed parent shows its open-descendant count at the right; leaf rows show no chevron.
-- [ ] Nesting guides are 1px hairlines; the branch containing the selection draws its guide in accent.
-- [ ] Toolbar shows the breadcrumb; the bottom hint bar shows the shortcuts listed in DESIGN, minus "⌘/ All shortcuts" (D20).
+- [x] A collapsed parent shows its open-descendant count at the right; leaf rows show no chevron.
+- [x] Nesting guides are 1px hairlines; the branch containing the selection draws its guide in accent.
+- [x] Toolbar shows the breadcrumb; the bottom hint bar shows the shortcuts listed in DESIGN, minus "⌘/ All shortcuts" (D20).
 
-**P1-08 · Frontend · Keyboard navigation and editing** · deps: P1-07, P1-02 · `done`
+**P1-08 · Frontend · Keyboard navigation and editing** · deps: P1-07, P1-02 · `review` — every keystroke (script 7–9)
 - [ ] ↑/↓ move a single selection through visible rows; selection never lands on a hidden row.
 - [ ] Space or typing starts editing the selected row; Esc stops editing and keeps the text.
 - [ ] ↵ on a selected row creates a sibling below in edit mode. ↵ while editing splits at the caret: text after the caret moves to a new sibling below; children stay with the original.
@@ -115,63 +115,63 @@ A task is done when its criteria pass, `swift build` is warning-free and `swift 
 - [ ] ⌘⌫ deletes the selected row and its subtree; selection moves to next sibling, else previous, else parent.
 - [ ] Empty-title handling follows D12. Every shortcut is a no-op on Inbox where D1 forbids it.
 
-**P1-09 · Frontend · Zoom, breadcrumb, empty state** · deps: P1-08 · `done`
+**P1-09 · Frontend · Zoom, breadcrumb, empty state** · deps: P1-08 · `review` — zoom keys, crumb click, empty state (script 8, 11)
 - [ ] ⌘] zooms into the selected row: its title becomes the 36 light page title, its children the rows, "N open" its open descendants. ⌘[ zooms out one level with the former node selected.
 - [ ] Breadcrumb shows `Home / … / Node`; clicking a crumb zooms there.
 - [ ] Given a zoomed node with 0 open tasks, the "All clear." block fades in after 400 ms with the node name in the copy; ↵ creates its first child in edit mode.
 - [ ] If the zoomed node is completed or deleted, the view zooms to its nearest open ancestor, else Home.
 
-**P1-10 · Frontend · Drag reorder** · deps: P1-07, P1-02 · `done`
+**P1-10 · Frontend · Drag reorder** · deps: P1-07, P1-02 · `review` — mouse drag, Esc cancel (script 10)
 - [ ] Hover shows the 6-dot handle; dragging shows the lifted row, a 35% ghost at the origin and the 2px accent drop line with ring.
 - [ ] The drop line appears only at valid targets per D15; releasing moves the task and its subtree there. Esc or release on an invalid target cancels with no change.
 - [ ] A drag is one undo step (once P1-12 lands).
 
-**P1-11 · Frontend · Strike & Fold** · deps: P1-07, P1-03 · `done`
+**P1-11 · Frontend · Strike & Fold** · deps: P1-07, P1-03 · `review` — animation timing, rapid ⌘↵, Reduce Motion (script 11)
 - [ ] ⌘↵ or a circle click plays the timeline in DESIGN "Completion" (verify by screen recording frame-step: fill 0–90, strike 30–150, fade 90–160, fold 160–280 ms).
 - [ ] A parent's children strike top to bottom with 40 ms stagger, then the branch folds as one.
 - [ ] Five rapid ⌘↵ presses complete five rows; none is dropped or waits for a prior animation.
 - [ ] Selection ends on next sibling, else previous, else parent.
 - [ ] With Reduce Motion: instant fill and strike, 400 ms hold, 120 ms fade, single-frame reflow.
 
-**P1-12 · Frontend · Undo wiring and toast** · deps: P1-04, P1-11 · `done`
+**P1-12 · Frontend · Undo wiring and toast** · deps: P1-04, P1-11 · `review` — ⌘Z / ⇧⌘Z, toast, field-only undo (script 7, 9, 11)
 - [ ] ⌘Z / ⇧⌘Z in the outline call Core undo / redo; the restored row is selected and scrolled into view.
 - [ ] After a completion the toast "Done · <title>  ⌘Z Undo" rises 8px in 160 ms, holds 4 s, pauses while hovered, and is replaced by the next completion's toast.
 - [ ] While a title is being edited, ⌘Z undoes typing in the field only.
 
-**P1-13 · Frontend · History** · deps: P1-05, P1-07 · `done`
-- [x] ⌘Y shows "Home / History", title "Finished", meta "Kept forever, on this Mac"; ⌘[ or the Home crumb returns to the outline.
-- [x] Rows grouped by day with headers and counts per D16 and D17; row shows faint filled check, unstruck ink-mute title, parent path, time.
-- [x] ↑/↓ select rows. Hover or selection shows Restore; click or ⌘R restores and the row leaves History.
+**P1-13 · Frontend · History** · deps: P1-05, P1-07 · `review` — ⌘Y, ↑↓, ⌘R, ⌘[ (script 12)
+- [ ] ⌘Y shows "Home / History", title "Finished", meta "Kept forever, on this Mac"; ⌘[ or the Home crumb returns to the outline.
+- [ ] Rows grouped by day with headers and counts per D16 and D17; row shows faint filled check, unstruck ink-mute title, parent path, time.
+- [ ] ↑/↓ select rows. Hover or selection shows Restore; click or ⌘R restores and the row leaves History.
 
-**P1-14 · Frontend · Capture: Details, `/name`, draft, ⌥↵** · deps: P0-07, P1-02, P1-06 · `done`
-- [x] ⇥ in the title expands Details (Note, "Under" picker); ⇧⇥ returns to the title. In Note, ↵ is a newline and ⌘↵ saves. ↵ in the title always saves.
-- [x] The "Under" picker and `/name` both use parent search and behave per D7; the footer destination and the saved pill name the chosen parent.
-- [x] Given Esc with text entered, when the panel reopens within 60 s, then title, note and destination are restored; after 60 s or after a save it opens blank.
-- [x] ⌥↵ saves, clears the fields, keeps the panel open and the destination unchanged; no pill is shown.
+**P1-14 · Frontend · Capture: Details, `/name`, draft, ⌥↵** · deps: P0-07, P1-02, P1-06 · `review` — Details, `/name`, draft, ⌥↵ (script 3–4)
+- [ ] ⇥ in the title expands Details (Note, "Under" picker); ⇧⇥ returns to the title. In Note, ↵ is a newline and ⌘↵ saves. ↵ in the title always saves.
+- [ ] The "Under" picker and `/name` both use parent search and behave per D7; the footer destination and the saved pill name the chosen parent.
+- [ ] Given Esc with text entered, when the panel reopens within 60 s, then title, note and destination are restored; after 60 s or after a save it opens blank.
+- [ ] ⌥↵ saves, clears the fields, keeps the panel open and the destination unchanged; no pill is shown.
 
 ## M3 — P2
 
 **P2-01 · Backend · Today summary** · deps: P1-05 · `done`
-- [ ] One query returns: finished-today count (04:00 boundary), the 3 most recently finished titles, and the total open count.
+- [x] One query returns: finished-today count (04:00 boundary), the 3 most recently finished titles, and the total open count.
 
-**P2-02 · Frontend · Daily Closure card** · deps: P2-01 · `todo`
+**P2-02 · Frontend · Daily Closure card** · deps: P2-01 · `review` — ⌘D anchor, ↵ / Esc / ⌘Y (script 13); F6
 - [ ] ⌘D (outline or popover open) shows the 340-wide card anchored to the menu bar icon; Esc or ↵ closes it; ⌘Y opens History.
-- [ ] Headline and closing line match the DESIGN copy table for counts 0, 1, 2–5, ≥6 and list-empty (precedence per D18).
-- [ ] Marks: one bar per finished task, capped at 8. Titles: latest 3, then "and N more" when N > 0.
-- [ ] No percentage, streak, goal, comparison, notification, sound or confetti appears anywhere.
+- [x] Headline and closing line match the DESIGN copy table for counts 0, 1, 2–5, ≥6 and list-empty (precedence per D18).
+- [x] Marks: one bar per finished task, capped at 8. Titles: latest 3, then "and N more" when N > 0.
+- [x] No percentage, streak, goal, comparison, notification, sound or confetti appears anywhere.
 
-**P2-03 · Frontend · Settings window** · deps: P0-04 · `todo`
+**P2-03 · Frontend · Settings window** · deps: P0-04 · `review` — appearance, launch at login, Show in Finder (script 14–15); F7
 - [ ] "Settings…" appears in the popover footer; it and ⌘, open one 560-wide window.
 - [ ] Launch at login toggles `SMAppService` state and reflects the real state on reopen.
 - [ ] Appearance System / Light / Dark applies instantly to all Hush surfaces and persists across relaunch.
 - [ ] "Your tasks live on this Mac" shows the real DB path; Show in Finder reveals the file.
 
-**P2-04 · Frontend · Shortcut recorder** · deps: P2-03, P0-06 · `todo`
+**P2-04 · Frontend · Shortcut recorder** · deps: P2-03, P0-06 · `review` — record, reject, reset (script 14); F8
 - [ ] Recording a new combination re-registers the hotkey immediately; the old one stops working; the choice persists across relaunch.
 - [ ] ✕ resets to ⌘⇧Space. A combination with no modifier, or one that fails to register, is rejected with an inline message and the previous shortcut stays active.
 - [ ] The popover capture row shows the current shortcut.
 
-**P2-05 · Frontend · Find** · deps: P1-07 · `todo`
+**P2-05 · Frontend · Find** · deps: P1-07 · `todo` — deferred post-MVP, see D25
 - [ ] ⌘F focuses the toolbar Find field. Typing filters the current zoom level to open tasks whose title contains the text (case-insensitive) plus their ancestors, expanded.
 - [ ] Esc clears the filter and restores the previous collapse state and selection.
 
@@ -202,6 +202,8 @@ Team Lead defaults: all confirmed; D5 and D9 are refined, D8 is new and deviates
 - **D22 New tasks** — Capture appends to the end of the destination's children. Outline ↵ always inserts a sibling directly below. No nesting depth cap; zoom is the answer to deep trees.
 - **D23 First launch** — No onboarding, no sample tasks, no window. Only the menu bar icon appears.
 - **D24 Hotkey conflict** — If the shortcut cannot be registered, fail quietly until P2-04 adds the inline message.
+- **D25 Find deferred** — P2-05 is not built for MVP. Nothing else depends on it, the toolbar reads correctly without the field, and zoom plus collapse cover navigation at MVP list sizes; the remaining effort goes to F1 and the manual pass. ⌘F stays unbound.
+- **D26 Errors are silent** — A rejected action (invalid title, protected Inbox) is a no-op with no system beep, in line with "no sounds".
 
 ## Open questions
 Engineers: append `Q<n> (role, task ID): question`. PM answers inline and promotes lasting answers to Product decisions.
@@ -209,4 +211,42 @@ Engineers: append `Q<n> (role, task ID): question`. PM answers inline and promot
 _None yet._
 
 ## Out of scope (MVP)
-Sync or cloud of any kind · accounts · AI · notifications · sounds · streaks, goals, percentages, comparisons, confetti · tags · due dates, reminders, recurrence · calendars · multi-select · trash UI · notes in the outline · rich text or Markdown · attachments · import / export · multiple windows of the outline · iOS or widgets · onboarding · Dock icon · shortcuts sheet (⌘/) · Reflect · Focus Mode · Quiet Momentum.
+Sync or cloud of any kind · accounts · AI · notifications · sounds · streaks, goals, percentages, comparisons, confetti · tags · due dates, reminders, recurrence · calendars · multi-select · trash UI · notes in the outline · rich text or Markdown · attachments · import / export · multiple windows of the outline · iOS or widgets · onboarding · Dock icon · Find (⌘F, D25) · shortcuts sheet (⌘/) · Reflect · Focus Mode · Quiet Momentum.
+
+## Review findings (PM)
+Review of c34774a by reading code and tests; nothing was run. Paths are relative to `Sources/`.
+
+| # | Criterion | Defect | Where | Severity |
+|---|---|---|---|---|
+| F1 | P1-03 box 2, D4 | Deleting a task also soft-deletes its already-completed descendants, so they vanish from History and the today count. Only open descendants should be deleted. | `HushCore/TaskStore.swift:264` (`notDeleted: true`) | **blocker** |
+| F2 | P1-05 box 1, D14 | The 04:00 boundary is computed by subtracting 4 absolute hours, so on the two DST-change days it sits one hour off. No DST test exists. | `HushCore/TaskStore.swift:420`, `:429-431`; `Tests/HushCoreTests/TaskStoreTests.swift:129` | minor |
+| F3 | P0-07 box 2 | The saved pill appears at full opacity at once; the 180 ms morph-in is missing (hold and fade are correct). | `Hush/CapturePanel.swift:344-350` | minor |
+| F4 | P0-08 box 5 | With zero open tasks the header still shows "0 of 0 open"; the count should be hidden. | `Hush/PopoverView.swift:45-52` | minor |
+| F5 | P0-08 box 6, DESIGN C | Popover footer has a "History ⌘Y" row that is not in the design. Remove the row; ⌘Y still works through the menu. | `Hush/PopoverView.swift:72-73` | minor |
+| F6 | D20 | Closure card footer shows the "↵ Reflect" hint; it should be hidden. | `Hush/ClosureCard.swift:55` | minor |
+| F7 | P2-03, DESIGN D | Appearance is a segmented control, not the three preview tiles. | `Hush/SettingsWindow.swift:167-169` | minor |
+| F8 | P2-04 box 3 | A shortcut on a non-letter key displays as "Key 18" in Settings and the popover. | `Hush/HotKey.swift:68-71` | minor |
+| F9 | D26 | Rejected actions call `NSSound.beep()`. | `Hush/OutlineModel.swift:225`, `:233`, `:279`, `:285`; `Hush/CapturePanel.swift:334-335` | minor |
+| F10 | P1-04 box 3, D5 | Restoring from History empties the whole undo and redo stacks, so an earlier completion can no longer be undone. Restore should only skip adding a step. | `HushCore/TaskStore.swift:285` | minor |
+| F11 | P0-03 box 5 | No test covers the `observe…` functions. | `Tests/HushCoreTests/TaskStoreTests.swift` | minor |
+
+Not defects: P1-01's Frontend sign-off was never recorded (Requests is empty); moot now that both sides shipped.
+
+## Manual test script
+About 3 minutes. Covers every task marked `review`. Run steps 1–14 on a throwaway database.
+
+1. `scripts/bundle.sh`, then `HUSH_DB_PATH=/tmp/hush-qa.sqlite build/Hush.app/Contents/MacOS/Hush &` (delete that file first). Expect a menu bar icon, no Dock icon, no window.
+2. With TextEdit frontmost press ⌘⇧Space: the panel appears at once, 640 wide near the top, caret in the field. ↵ on the empty field does nothing. Type `Buy milk` ↵: pill "✓ Saved to Inbox" for about a second, and the next key you type lands in TextEdit.
+3. ⌘⇧Space, type `draft`, Esc. ⌘⇧Space again: `draft` is back. ⌘⇧Space once more closes it. Reopen and click outside: it closes.
+4. ⌘⇧Space, replace the text with `Plan trip`, ⌥↵: the panel stays and clears. Type `Book flights /pl`: "Plan trip" is suggested; ↵ accepts, the token disappears and the footer names Plan trip. ⇥, type a two-line note (↵ makes a newline), ⇧⇥, ↵: pill "✓ Saved to Plan trip".
+5. Click the menu bar icon: 320-wide popover, Book flights / Plan trip / Buy milk newest first, "3 of 3 open". Click the circle on Buy milk: the row goes, "2 of 2 open". Esc closes the popover.
+6. Open the popover and press ⌘O: the outline opens showing Inbox › Plan trip › Book flights. ⌘O again gives the same window. Capture `Live` with the hotkey: it appears in the outline without reopening.
+7. In the outline: ↓ to Live, ↵, type `Alpha`, ↵, type `Beta`, Esc. ⇥ nests Beta under Alpha, ⇧⇥ brings it back, ⌥⌘↑ / ⌥⌘↓ reorder it. Space to edit, put the caret mid-word, ↵ splits the row. Type a few letters, ⌘Z removes only the typing, Esc. Edit a title to empty and Esc: the old title returns.
+8. Select Plan trip. ⌘. collapses it and shows "1" at the right; ⌘→ expands. ⌘] zooms in (title "Plan trip", breadcrumb Home / Inbox / Plan trip, "1 open"); click the Inbox crumb, then ⌘[ returns to Home with Inbox selected.
+9. Select Alpha, ⌘⌫: it disappears and a neighbour is selected. ⌘Z brings it back selected, ⇧⌘Z removes it again, ⌘Z restores it.
+10. Hover Beta and drag its six-dot handle: lifted row, faint ghost at the origin, blue drop line with ring; moving sideways changes the line's depth. No line appears above Inbox or inside Beta's own subtree. Drop it under Plan trip; ⌘Z puts it back in one step. Start another drag and press Esc: nothing moves.
+11. Select Plan trip, ⌘↵: the circle fills blue, the strike draws left to right, the child strikes just after, the branch folds, and the toast "Done · Plan trip  ⌘Z Undo" rises and stays about 4 s (longer while hovered). ⌘Z restores both rows. Now press ⌘↵ rapidly until only Inbox is left: no row is skipped. Select Inbox, ⌘]: "All clear." fades in; ↵ starts a new row. Complete one more task with Reduce Motion on: no fold, just a short fade.
+12. ⌘Y: "Home / History", title "Finished", a Today header with a count, unstruck grey titles with path and time. ↓ selects a row, ⌘R restores it and the row leaves. ⌘[ returns to the outline, where the task is back.
+13. ⌘D: a card under the menu bar icon; headline fits the count (2–5 gives "Steady progress."), one bar per finished task up to 8, three titles then "and N more". ↵ closes it. ⌘D then ⌘Y opens History.
+14. ⌘, opens Settings. Switch Light, Dark, System: outline, popover and Settings change at once; in Light, check the selected-row wash, hover fill and guides against DESIGN tokens. Click the shortcut, press ⌃⌥H: ⌘⇧Space stops opening capture, ⌃⌥H opens it, the popover row shows the new shortcut. Record a bare letter: rejected with a message. ✕ resets to ⌘⇧Space.
+15. ⌘W closes a window and the icon stays; ⌘Q quits. Relaunch as in step 1: tasks and collapsed state are intact; quit. Then run `open build/Hush.app` twice: one menu bar icon. In Settings, toggle Launch at login and reopen Settings (state holds), and Show in Finder reveals `hush.sqlite`.
