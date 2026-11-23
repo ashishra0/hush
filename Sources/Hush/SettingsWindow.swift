@@ -152,13 +152,17 @@ struct SettingsView: View {
                 VStack(alignment: .trailing, spacing: Theme.s1) {
                     HStack(spacing: Theme.s2) {
                         Button(action: model.toggleRecording) {
-                            Text(model.recording ? "Type shortcut…" : Self.spaced(model.shortcut))
-                                .font(.geist(size: 14, design: .monospaced))
-                                .foregroundStyle(model.recording ? Theme.accent : Theme.ink)
-                                .padding(.horizontal, Theme.s4).frame(height: 30)
-                                .background(Theme.surfaceSunk, in: RoundedRectangle(cornerRadius: Theme.rKeycap))
-                                .overlay(RoundedRectangle(cornerRadius: Theme.rKeycap)
-                                    .strokeBorder(model.recording ? Theme.accent : Theme.hairline, lineWidth: 1))
+                            Group {
+                                if model.recording {
+                                    Text("Type shortcut…").font(Theme.bodyFont).foregroundStyle(Theme.accent)
+                                } else {
+                                    HStack(spacing: Theme.s1) { ForEach(Self.keys(model.shortcut), id: \.self) { Keycap(text: $0) } }
+                                }
+                            }
+                            .padding(.horizontal, 5).frame(minWidth: 120, minHeight: 30)
+                            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.rRow))
+                            .overlay(RoundedRectangle(cornerRadius: Theme.rRow)
+                                .strokeBorder(model.recording ? Theme.accent : Theme.hairline, lineWidth: 1))
                         }.buttonStyle(.plain)
                         Button(action: model.resetShortcut) {
                             Image(systemName: "xmark").font(.geist(size: 10, weight: .semibold)).foregroundStyle(Theme.inkFaint)
@@ -208,10 +212,10 @@ struct SettingsView: View {
     }
 
     /// "⇧⌘Space" -> "⌘  ⇧  Space" (modifiers spaced, ⌘ first, as in the design).
-    private static func spaced(_ d: String) -> String {
+    /// "⇧⌘Space" → ["⇧", "⌘", "Space"] in Apple's modifier order (⌃⌥⇧⌘), one keycap each.
+    private static func keys(_ d: String) -> [String] {
         let mods = "⌃⌥⇧⌘"
-        let m = d.filter { mods.contains($0) }, key = String(d.drop { mods.contains($0) })
-        return (["⌘", "⇧", "⌥", "⌃"].filter { m.contains($0) } + [key]).joined(separator: "  ")
+        return mods.filter { d.contains($0) }.map(String.init) + [String(d.drop { mods.contains($0) })]
     }
 
     private func tile(_ tag: String, _ label: String) -> some View {
