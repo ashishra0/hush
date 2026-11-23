@@ -1,6 +1,7 @@
 import AppKit
 import HushCore
 import Observation
+import SwiftUI
 
 enum RowID: Hashable { case task(TaskID), draft }
 enum Editing: Equatable { case task(TaskID), draft }
@@ -14,6 +15,8 @@ struct KeyPress {
     let typed: String
 }
 
+enum FindState { case none, ancestor, match }
+
 struct FlatRow: Identifiable {
     let id: RowID
     let task: TaskItem?          // nil = draft
@@ -21,6 +24,19 @@ struct FlatRow: Identifiable {
     let ancestors: [TaskID]      // outermost first; ancestors[k] owns guide k
     let childCount: Int
     let descendantCount: Int
+    var findState: FindState = .none
+}
+
+struct FocusSnap { let title: String; let note: String; let crumb: String }
+
+/// Focus Mode session: one task at a time, "next" = pre-order successor.
+struct FocusSession {
+    var current: TaskID?          // nil = nothing left
+    var queued: TaskID?
+    var finished = 0
+    var outgoing: FocusSnap?      // task that was just completed, animating out
+    var start = Date()
+    var last: TaskID?             // selected on exit when current is nil
 }
 
 /// A row group that has already been completed in the store but is still animating out (Strike & Fold).
@@ -29,6 +45,7 @@ struct Ghost: Identifiable {
     let start = Date()
     let rows: [FlatRow]
     let anchor: RowID?           // display row it sits right after
+    let heights: [CGFloat]       // natural row heights (rows can wrap)
     let reduceMotion: Bool
     /// ms. Children strike +40ms apart, then the whole branch folds as one.
     var foldStart: Double { reduceMotion ? 520 : 160 + 40 * Double(rows.count - 1) }
@@ -41,8 +58,9 @@ struct Toast: Identifiable { let id = UUID(); let title: String }
 struct DropTarget: Equatable {
     let gap: Int, depth: Int
     let parent: TaskID?, index: Int
+    let y: CGFloat               // drop line position in rows space
 }
-struct DragState { let id: TaskID; var dy: CGFloat; var target: DropTarget? }
+struct DragState { let id: TaskID; var dy: CGFloat; var originY: CGFloat; var target: DropTarget? }
 
 struct DisplayRow: Identifiable {
     let row: FlatRow
@@ -74,6 +92,18 @@ final class OutlineModel {
     private(set) var ghosts: [Ghost] = []
     private(set) var toast: Toast?
     private(set) var drag: DragState?
+    private(set) var find = ""
+    var findActive = false                      // find field has keyboard focus
+    private(set) var findFocusTick = 0
+    private(set) var findBlurTick = 0
+    @ObservationIgnored private var preFindSelection: TaskID?
+    private(set) var focus: FocusSession?
+    var showShortcuts = false
+    private(set) var todayCount = 0
+    private(set) var momentumPulse: Date?
+    @ObservationIgnored var rowFrames: [String: CGRect] = [:]
+    @ObservationIgnored weak var marksAnchor: NSView?
+    @ObservationIgnored var onFocusChange: (Bool) -> Void = { _ in }
     @ObservationIgnored private var dragCancelled = false
 
     init(store: TaskStore) {
@@ -108,10 +138,32 @@ final class OutlineModel {
     /// Visible rows of the current zoom level (no ghosts), incl. the draft row.
     var realRows: [FlatRow] {
         var out: [FlatRow] = []
-        walk(zoomNodes, parent: zoomRoot, depth: 0, anc: [], &out)
+        if isFinding { walkFind(zoomNodes, depth: 0, anc: [], &out) }
+        else { walk(zoomNodes, parent: zoomRoot, depth: 0, anc: [], &out) }
         return out
     }
-    private var navRows: [FlatRow] { realRows.filter { $0.task != nil } }
+    /// Rows the selection can land on (only matches while finding).
+    private var navRows: [FlatRow] {
+        realRows.filter { $0.task != nil && (!isFinding || $0.findState == .match) }
+    }
+
+    var findQuery: String { find.trimmingCharacters(in: .whitespacesAndNewlines) }
+    var isFinding: Bool { !findQuery.isEmpty }
+    var momentumVisible: Bool { UserDefaults.standard.bool(forKey: "showMomentum") && todayCount > 0 }
+
+    /// Matches (case-insensitive substring, Inbox node itself excluded) with their ancestors, all expanded.
+    private func walkFind(_ nodes: [OutlineNode], depth: Int, anc: [TaskID], _ out: inout [FlatRow]) {
+        for n in nodes {
+            let m = !n.task.isInbox && n.task.title.range(of: findQuery, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+            var sub: [FlatRow] = []
+            walkFind(n.children, depth: depth + 1, anc: anc + [n.id], &sub)
+            if m || !sub.isEmpty {
+                out.append(FlatRow(id: .task(n.id), task: n.task, depth: depth, ancestors: anc, childCount: 0,
+                                   descendantCount: 0, findState: m ? .match : .ancestor))
+                out += sub
+            }
+        }
+    }
 
     private func walk(_ nodes: [OutlineNode], parent: TaskID?, depth: Int, anc: [TaskID], _ out: inout [FlatRow]) {
         func draftRow() -> FlatRow {
@@ -172,6 +224,12 @@ final class OutlineModel {
             selection = rows.isEmpty ? nil : rows[min(oldIndex ?? 0, rows.count - 1)].task?.id
         }
         if case .task(let e) = editing, node(e) == nil { editing = nil }
+        todayCount = (try? store.todaySummary().doneCount) ?? 0
+        if var f = focus, f.outgoing == nil, let c = f.current, node(c) == nil {   // changed elsewhere
+            f.current = f.queued.flatMap { node($0) != nil ? $0 : nil }
+            f.queued = f.current.flatMap { focusNext(after: $0, skipSubtree: false) }
+            focus = f
+        }
     }
 
     private func siblings(of id: TaskID) -> (parent: TaskID?, list: [OutlineNode])? {
@@ -396,14 +454,23 @@ final class OutlineModel {
         let anchor = i > 0 ? rows[i - 1].row.id : nil
         let next = successor(of: id)
         guard (try? store.complete(id)) != nil else { return }
-        let g = Ghost(rows: slice, anchor: anchor, reduceMotion: Theme.reduceMotion)
+        let heights = slice.map { rowFrames[DisplayRow.key($0.id)]?.height ?? Theme.rowHeight }
+        let g = Ghost(rows: slice, anchor: anchor, heights: heights, reduceMotion: Theme.reduceMotion)
         ghosts.append(g)
+        momentumPulse = Date()
         toast = Toast(title: t.title)
         selection = next
         reload()
         DispatchQueue.main.asyncAfter(deadline: .now() + (g.duration + 80) / 1000) { [weak self] in
             self?.ghosts.removeAll { $0.id == g.id }
         }
+    }
+
+    /// Anchors the Daily Closure card to the toolbar marks (click or ⌘D).
+    func showClosureFromMarks() -> Bool {
+        guard momentumVisible, let v = marksAnchor, v.window != nil else { return false }
+        ClosureCard.show(relativeTo: v, store: store)
+        return true
     }
 
     func dismissToast(_ id: UUID) { if toast?.id == id { toast = nil } }
@@ -419,15 +486,17 @@ final class OutlineModel {
         toast = nil
         ghosts.removeAll { g in g.rows.contains { r in r.task.map { ids.contains($0.id) } ?? false } }
         reload()
-        // Bring the first restored row into view: leave a zoom it isn't under, expand collapsed ancestors.
-        if let id = ids.first(where: { node($0) != nil }), let anc = ancestors(of: id) {
-            if let z = zoomRoot, !anc.contains(z) { zoomPath = [] }
-            for a in anc where node(a)?.task.collapsed == true { try? store.setCollapsed(a, false) }
-            reload()
-            selection = id
-        } else if let id = ids.first(where: { i in navRows.contains { $0.id == .task(i) } }) {
-            selection = id
-        }
+        if let id = ids.first(where: { node($0) != nil }) { reveal(id) }
+        else if let id = ids.first(where: { i in navRows.contains { $0.id == .task(i) } }) { selection = id }
+    }
+
+    /// Select `id`, leaving a zoom it isn't under and expanding collapsed ancestors so it is visible.
+    func reveal(_ id: TaskID) {
+        guard let anc = ancestors(of: id) else { return }
+        if let z = zoomRoot, !anc.contains(z), id != z { zoomPath = [] }
+        for a in anc where node(a)?.task.collapsed == true { try? store.setCollapsed(a, false) }
+        reload()
+        selection = id
     }
 
     private func ancestors(of id: TaskID) -> [TaskID]? {
@@ -446,7 +515,8 @@ final class OutlineModel {
     func dragChanged(_ id: TaskID, location: CGPoint, translation: CGSize) {
         if dragCancelled { return }
         if drag == nil { commitEditing(); selection = id }
-        drag = DragState(id: id, dy: translation.height,
+        let origin = rowFrames[DisplayRow.key(.task(id))]?.minY ?? 0
+        drag = DragState(id: id, dy: translation.height, originY: origin,
                          target: dropTarget(id, y: location.y, dx: translation.width))
     }
 
@@ -463,13 +533,17 @@ final class OutlineModel {
 
     func cancelDrag() { if drag != nil { dragCancelled = true; drag = nil } }
 
-    /// `y` is the pointer in rows space (row height 32, first row at 0); `dx` picks depth in 24pt steps.
+    /// `y` is the pointer in rows space; the gap is chosen against real row frames (rows can wrap); `dx` picks depth in 24pt steps.
     private func dropTarget(_ id: TaskID, y: CGFloat, dx: CGFloat) -> DropTarget? {
         let rows = navRows
         guard let i = rows.firstIndex(where: { $0.id == .task(id) }) else { return nil }
+        func frame(_ k: Int) -> CGRect {
+            rowFrames[DisplayRow.key(rows[k].id)] ?? CGRect(x: 0, y: CGFloat(k) * Theme.rowHeight, width: 0, height: Theme.rowHeight)
+        }
         var j = i
         while j + 1 < rows.count, rows[j + 1].depth > rows[i].depth { j += 1 }
-        let g = min(max(Int(floor(y / Theme.rowHeight + 0.5)), 0), rows.count)
+        var g = 0
+        while g < rows.count, frame(g).midY < y { g += 1 }
         if g > i && g <= j { return nil }                                   // inside its own subtree
         if g == 0, rows.first?.task?.isInbox == true { return nil }         // never above Inbox
         var p = g - 1; if p >= i && p <= j { p = i - 1 }
@@ -492,13 +566,154 @@ final class OutlineModel {
         let index = parentIsCollapsedPrev ? sibs.count : sibs.filter { s in
             rows.firstIndex { $0.id == .task(s.id) }.map { $0 < g } ?? false
         }.count
-        return DropTarget(gap: g, depth: d, parent: parent, index: index)
+        let lineY = g == 0 ? frame(0).minY : frame(g - 1).maxY
+        return DropTarget(gap: g, depth: d, parent: parent, index: index, y: lineY)
+    }
+
+    // MARK: Find (⌘F)
+
+    func focusFind() { commitEditing(); findFocusTick += 1 }
+
+    func setFind(_ s: String) {
+        if !isFinding { preFindSelection = selection }
+        find = s
+        let rows = navRows
+        if isFinding, selection.map({ id in !rows.contains { $0.id == .task(id) } }) ?? true {
+            selection = rows.first?.task?.id
+        }
+        if !isFinding, let p = preFindSelection { selection = p }
+    }
+
+    /// Esc: clear the filter, restore selection, hand focus back to the outline.
+    func clearFind() {
+        let restore = preFindSelection
+        find = ""
+        findBlurTick += 1
+        if let r = restore, node(r) != nil { selection = r }
+    }
+
+    /// ↵: clear the filter, reveal (expand ancestors) and select the highlighted match.
+    func jumpToMatch() {
+        let id = isFinding ? selection : nil
+        find = ""
+        findBlurTick += 1
+        if let id { reveal(id) } else if let r = preFindSelection { selection = r }
+    }
+
+    // MARK: Focus Mode (⌘⇧F)
+
+    /// Whole-outline pre-order (Inbox node itself skipped, its children kept).
+    private func preorder() -> [OutlineNode] {
+        var out: [OutlineNode] = []
+        func go(_ nodes: [OutlineNode]) { for n in nodes { if !n.task.isInbox { out.append(n) }; go(n.children) } }
+        go(tree)
+        return out
+    }
+
+    private func focusNext(after id: TaskID, skipSubtree: Bool) -> TaskID? {
+        let flat = preorder()
+        guard let i = flat.firstIndex(where: { $0.id == id }) else { return nil }
+        var skip = Set<TaskID>()
+        if skipSubtree { func add(_ n: OutlineNode) { skip.insert(n.id); n.children.forEach(add) }; add(flat[i]) }
+        return flat[(i + 1)...].first { !skip.contains($0.id) }?.id
+    }
+
+    func snap(_ id: TaskID) -> FocusSnap? {
+        guard let n = node(id) else { return nil }
+        let path = (ancestors(of: id) ?? []).compactMap { node($0)?.task.title }
+        let crumb = (path.isEmpty ? ["Home"] : path).joined(separator: " › ")
+        return FocusSnap(title: n.task.title, note: n.task.note, crumb: crumb)
+    }
+
+    /// Up to 5 rows before / after the focused task in pre-order, for the 10% ghost context.
+    func focusContext() -> (above: [(String, Int)], below: [(String, Int)]) {
+        func depth(_ id: TaskID) -> Int { ancestors(of: id)?.count ?? 0 }
+        let flat = preorder()
+        guard let c = focus?.current, let i = flat.firstIndex(where: { $0.id == c }) else {
+            return (flat.suffix(5).map { ($0.task.title, depth($0.id)) }, [])
+        }
+        return (flat[max(0, i - 5)..<i].map { ($0.task.title, depth($0.id)) },
+                flat[(i + 1)...].prefix(5).map { ($0.task.title, depth($0.id)) })
+    }
+
+    /// Test hook (HUSH_OPEN=focus): focus the first non-Inbox top-level task.
+    func focusFirstTask() {
+        if let n = tree.first(where: { !$0.task.isInbox }) { selection = n.id; toggleFocus() }
+    }
+
+    func toggleFocus() {
+        if focus != nil { exitFocus(); return }
+        commitEditing()
+        guard let id = selection, let n = node(id), !n.task.isInbox else { return }
+        if isFinding { clearFind() }
+        withAnimation(Theme.reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+            focus = FocusSession(current: id, queued: focusNext(after: id, skipSubtree: false))
+        }
+        onFocusChange(true)
+    }
+
+    func exitFocus() {
+        guard let f = focus else { return }
+        let target = f.current ?? f.queued ?? f.last
+        withAnimation(Theme.reduceMotion ? nil : .easeInOut(duration: 0.2)) { focus = nil }
+        onFocusChange(false)
+        if let t = target, node(t) != nil { reveal(t) }
+    }
+
+    func focusSkip() {
+        guard var f = focus, let c = f.current, let n = f.queued else { return }
+        f.last = c; f.current = n; f.queued = focusNext(after: n, skipSubtree: false)
+        withAnimation(.easeInOut(duration: 0.15)) { focus = f }
+    }
+
+    /// ⌘↵: complete the focused task; it lifts away while the next one rises in.
+    func focusComplete() {
+        guard var f = focus, let c = f.current, let out = snap(c) else { return }
+        let next = focusNext(after: c, skipSubtree: true)
+        guard (try? store.complete(c)) != nil else { return }
+        f.outgoing = out; f.start = Date(); f.last = c
+        f.finished += 1
+        f.current = next
+        f.queued = next.flatMap { focusNext(after: $0, skipSubtree: false) }
+        focus = f
+        momentumPulse = Date()
+        reload()
+        let started = f.start
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            if self?.focus?.start == started { self?.focus?.outgoing = nil }
+        }
+    }
+
+    private func handleFocus(_ k: KeyPress) -> Bool {
+        switch k.code {
+        case 53: exitFocus(); return true
+        case 3 where k.cmd && k.shift: exitFocus(); return true
+        case 36 where k.cmd, 76 where k.cmd: focusComplete(); return true
+        case 125 where !k.cmd && !k.opt: focusSkip(); return true
+        default: return !k.cmd                       // no typing into the hidden outline
+        }
     }
 
     // MARK: Keys
 
     /// Returns true if handled. While editing, plain keys (typing, ↵, ⇥, Esc, arrows) belong to the text field.
     func handle(_ k: KeyPress) -> Bool {
+        if showShortcuts {                            // ⌘/ sheet: Esc or ⌘/ closes, nothing else leaks through
+            if k.code == 53 || (k.code == 44 && k.cmd) { showShortcuts = false }
+            return !k.cmd
+        }
+        if focus != nil { return handleFocus(k) }
+        if k.code == 44 && k.cmd { commitEditing(); showShortcuts = true; return true }       // ⌘/
+        if k.code == 3 && k.cmd && k.shift { toggleFocus(); return true }                       // ⌘⇧F
+        if k.code == 3 && k.cmd { focusFind(); return true }                                    // ⌘F
+        if findActive || isFinding, !k.cmd {
+            switch k.code {
+            case 53: clearFind(); return true
+            case 36, 76: jumpToMatch(); return true
+            case 126, 125: moveSelection(k.code == 126 ? -1 : 1); return true
+            default: return !findActive            // typing belongs to the Find field
+            }
+        }
         let isEditing = editing != nil
         switch k.code {
         case 53 where drag != nil:                    // Esc cancels a drag

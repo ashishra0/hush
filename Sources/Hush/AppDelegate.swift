@@ -81,6 +81,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case "history": openHistory()
             case "closure": openClosure()
             case "capture": capture.show()
+            case "reflection": ReflectionWindowController.shared.show(store: store)
+            case "focus", "shortcuts": outline.showDebug(t)
             case "popover": togglePopover()
             default: NSLog("Hush: HUSH_OPEN token not available: \(t)")
             }
@@ -92,6 +94,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func openOutline() { outline.show() }
     @objc private func openSettings() { SettingsWindowController.shared.show() }
     @objc private func openClosure() {
+        if outline.showClosureFromMarks() { return }
         guard let b = statusItem.button else { return }
         NSApp.activate()
         ClosureCard.show(relativeTo: b, store: store)
@@ -110,6 +113,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             popover.performClose(nil)
         } else {
             popoverModel.shortcut = HotKey.shared.display
+            popover.appearance = NSApp.appearance            // follow Settings' Light/Dark (nil = system)
+            popover.contentViewController?.view.appearance = NSApp.appearance
             NSApp.activate()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         }

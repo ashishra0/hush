@@ -53,20 +53,19 @@ struct ReflectionView: View {
     let store: TaskStore
     let close: () -> Void
     let history: () -> Void
-    @State private var days: [HistoryDay] = []
-    @State private var openCount = 0
+    @State private var summaries: [DaySummary] = [] // index = days back from today (0...6)
+    @State private var week: [DayCount] = []        // 7, oldest first
     @State private var offset = 0 // 0 = today, 1 = yesterday ...
     @State private var grown = Theme.reduceMotion
     @FocusState private var focused: Bool
     private let cal = Calendar.current
 
-    private var today: Date { cal.startOfDay(for: Date().addingTimeInterval(-Double(TaskStore.dayBoundaryHour) * 3600)) }
-    private func date(_ off: Int) -> Date { cal.date(byAdding: .day, value: -off, to: today) ?? today }
-    private func entries(_ off: Int) -> [HistoryEntry] { days.first { cal.isDate($0.day, inSameDayAs: date(off)) }?.entries ?? [] }
+    private func entries(_ off: Int) -> [HistoryEntry] { summaries.indices.contains(off) ? summaries[off].finished : [] }
+    private func date(_ off: Int) -> Date { summaries.indices.contains(off) ? summaries[off].day : TaskStore.logicalDay(of: Date()) }
 
     var body: some View {
         let list = entries(offset), n = list.count
-        let copy = ClosureCopy.choose(doneCount: n, openCount: offset == 0 ? openCount : max(openCount, 1))
+        let copy = summaries.indices.contains(offset) ? summaries[offset].copy : ClosureCopy.choose(doneCount: 0, openCount: 1)
         ZStack {
             Dk.ground.ignoresSafeArea()
             VStack(alignment: .leading, spacing: 20) {
@@ -80,7 +79,7 @@ struct ReflectionView: View {
                         ForEach(list.prefix(12)) { e in
                             HStack(alignment: .firstTextBaseline, spacing: 8) {
                                 Text(Self.time.string(from: e.task.completedAt ?? Date())).font(.system(size: 11, design: .monospaced))
-                                    .foregroundStyle(Dk.inkFaint).frame(width: 40, alignment: .leading)
+                                    .foregroundStyle(Dk.inkFaint).fixedSize().frame(width: 64, alignment: .leading)
                                 Text(e.task.title).font(.system(size: 14)).foregroundStyle(Dk.list).lineLimit(1)
                             }
                         }
@@ -90,7 +89,7 @@ struct ReflectionView: View {
                 Text(copy.closing).font(.system(size: 20).italic()).foregroundStyle(Dk.ink)
                 Rectangle().fill(Dk.hairline).frame(height: 1).padding(.top, 8)
                 Text("THIS WEEK").font(.system(size: 10, design: .monospaced)).foregroundStyle(Dk.inkFaint)
-                WeekStrip(counts: (0..<7).reversed().map { off in (cal.component(.weekday, from: date(off)), entries(off).count, off == 0) }, cal: cal)
+                WeekStrip(counts: week.enumerated().map { (cal.component(.weekday, from: $1.day), $1.count, $0 == week.count - 1) }, cal: cal)
                 Text("One dot per finished task. Rest days are just quiet.").font(.system(size: 12)).foregroundStyle(Dk.inkFaint)
             }
             .id(offset)
@@ -109,21 +108,21 @@ struct ReflectionView: View {
             reload()
             if !grown { withAnimation(.easeOut(duration: 0.32)) { grown = true } }
         }
-        .onKeyPress(.leftArrow) { offset = min(offset + 1, maxOffset); return .handled }
+        .onKeyPress(.leftArrow) { offset = min(offset + 1, 6); return .handled }
         .onKeyPress(.rightArrow) { offset = max(offset - 1, 0); return .handled }
         .onKeyPress(.escape) { close(); return .handled }
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in reload() }
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didWakeNotification)) { _ in reload() }
         .background { Button("") { history() }.keyboardShortcut("y", modifiers: .command).opacity(0) }
         .accessibilityElement(children: .contain)
     }
 
-    private var maxOffset: Int {
-        guard let oldest = days.last?.day else { return 0 }
-        return max(cal.dateComponents([.day], from: oldest, to: today).day ?? 0, 0)
-    }
-
     private func reload() {
-        days = (try? store.history()) ?? []
-        openCount = (try? store.openCount()) ?? 0
+        let today = TaskStore.logicalDay(of: Date())
+        week = (try? store.weekCounts(endingOn: today)) ?? []
+        summaries = (0..<7).compactMap { off in
+            cal.date(byAdding: .day, value: -off, to: today).flatMap { try? store.daySummary(for: $0) }
+        }
     }
 
     private var label: String {

@@ -10,11 +10,11 @@ enum ClosureCard {
     private static let popover = NSPopover()
 
     static func show(relativeTo view: NSView, store: TaskStore) {
-        guard let summary = try? store.todaySummary() else { return }
+        
         popover.close()
         popover.behavior = .transient
         popover.animates = !Theme.reduceMotion
-        let host = NSHostingController(rootView: ClosureView(summary: summary, now: Date(),
+        let host = NSHostingController(rootView: ClosureView(store: store,
             close: { popover.close() }, reflect: { popover.close(); ReflectionWindowController.shared.show(store: store) }, history: { popover.close(); onHistory() }))
         host.sizingOptions = [.preferredContentSize]
         popover.contentViewController = host
@@ -24,23 +24,39 @@ enum ClosureCard {
 }
 
 struct ClosureView: View {
-    let summary: TodaySummary
-    let now: Date
+    let store: TaskStore
+    @State private var summary: TodaySummary?
+    @State private var now = Date()
     let close: () -> Void
     let reflect: () -> Void
     let history: () -> Void
     @FocusState private var focused: Bool
 
     var body: some View {
+        Group { if let summary { card(summary) } else { Color.clear.frame(width: 340, height: 1) } }
+            .onAppear { reload(); schedule() }
+            .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in reload() }
+            .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didWakeNotification)) { _ in reload() }
+    }
+
+    private func reload() { now = Date(); summary = try? store.todaySummary() }
+
+    /// One timer at the next 04:00 rollover; re-arms itself.
+    private func schedule() {
+        let t = TaskStore.nextDayBoundary(after: Date())
+        DispatchQueue.main.asyncAfter(deadline: .now() + max(t.timeIntervalSinceNow, 1)) { reload(); schedule() }
+    }
+
+    @ViewBuilder private func card(_ summary: TodaySummary) -> some View {
         let n = summary.doneCount
         VStack(alignment: .leading, spacing: Theme.s3) {
             Text(Self.date(now)).font(.system(size: 10, design: .monospaced)).foregroundStyle(Theme.inkFaint)
             Text(summary.copy.headline).font(.system(size: 28, weight: .light)).foregroundStyle(Theme.ink)
             Text("\(n) \(n == 1 ? "thing" : "things") finished today.").font(Theme.bodyFont).foregroundStyle(Theme.inkMute)
             if n > 0 {
-                HStack(spacing: 3) {
+                HStack(spacing: 4) {
                     ForEach(0..<min(n, 8), id: \.self) { _ in
-                        RoundedRectangle(cornerRadius: 1).fill(Theme.ink).frame(width: 14, height: 3)
+                        RoundedRectangle(cornerRadius: 1).fill(Theme.ink).frame(width: 3, height: 14)
                     }
                 }
                 VStack(alignment: .leading, spacing: Theme.s1) {
@@ -69,7 +85,7 @@ struct ClosureView: View {
     }
 
     private static func date(_ d: Date) -> String {
-        let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("EEEEdMMMM"); return f.string(from: d).uppercased()
+        let f = DateFormatter(); f.dateFormat = "EEEE · d MMMM"; return f.string(from: d).uppercased()
     }
 
     private func hint(_ k: String, _ l: String) -> some View {

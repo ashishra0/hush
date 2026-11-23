@@ -225,23 +225,23 @@ Spec: DESIGN "Post-MVP (M4)". Owners: **BE** = HushCore · **FE-1** = Outline*, 
 - [ ] Outline window has a minimum size at which nothing overlaps, restores its frame after relaunch, and ⌘W closes it. No colour literal outside Theme in FE-1 files.
 - [ ] Menu bar icon appears within 300 ms of launch (measured, release build) with no layout jump when the outline or popover first opens. Light and dark each checked against DESIGN tokens.
 
-**P3-10 · FE-2 · Settings toggle** · deps: none · `todo`
+**P3-10 · FE-2 · Settings toggle** · deps: none · `done`
 - [ ] Settings shows a switch "Show today's progress in the toolbar", off on first launch, persisted under the key in D29, applied instantly.
 
-**P3-11 · FE-2 · Reflection window** · deps: P3-02 · `todo`
+**P3-11 · FE-2 · Reflection window** · deps: P3-02 · `done`
 - [ ] ↵ on the Daily Closure card opens a borderless window filling the screen that holds the card, always #0B0B0C; the card footer shows "↵ Reflect" again.
 - [ ] 640 column per DESIGN: date line, headline 64 light, count line, two-column time + title list (max 12, then "and N more"), italic closing line. Copy matches the card for today.
 - [ ] Opens with the 320 ms headline-grow cross-dissolve (150 ms fade with Reduce Motion). Esc closes and restores the previously key window; ⌘Y closes and opens History.
 
-**P3-12 · FE-2 · Week strip and other days** · deps: P3-11 · `todo`
+**P3-12 · FE-2 · Week strip and other days** · deps: P3-11 · `done`
 - [ ] "THIS WEEK" strip: 7 columns oldest to Today, one 4px dot per finished task (max 12), zero days show only the label, Today in #F2F2F3 semibold, caption per DESIGN.
 - [ ] ← / → move one day within the strip's 7 days (D31); → on today and ← on the oldest day do nothing. Date line, headline, count and list update; a day with nothing reads "A quiet day."
 
-**P3-13 · FE-2 · Find in History** · deps: P3-03 · `todo`
+**P3-13 · FE-2 · Find in History** · deps: P3-03 · `done`
 - [ ] ⌘F focuses a "Find finished" field styled like the outline's. Typing filters rows, keeping day headers that still have rows, with the match bold; no match shows "No finished tasks match “q”.".
 - [ ] ↑/↓ move among matches, ↵ clears the query and leaves that row selected and visible, Esc clears and returns focus to the list (a second Esc closes History as today). ⌘R restores the selected match.
 
-**P3-14 · FE-2 · Polish: History, Settings, card, capture, reflection** · deps: P3-10 to P3-13 for the final pass · `todo`
+**P3-14 · FE-2 · Polish: History, Settings, card, capture, reflection** · deps: P3-10 to P3-13 for the final pass · `done`
 - [ ] History and suggestion titles truncate with …; nothing clips at minimum window size. History and Settings restore their frames; ⌘W closes each; Esc per D32.
 - [ ] VoiceOver: History rows read title, path and time; Restore, the switch, appearance tiles and the shortcut recorder have labels.
 - [ ] Light and dark each checked against DESIGN tokens; no colour literal outside Theme in FE-2 files except the fixed reflection palette.

@@ -170,8 +170,7 @@ struct SettingsView: View {
             divider
             row("Launch at login") {
                 VStack(alignment: .trailing, spacing: Theme.s1) {
-                    Toggle("", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunch($0) }))
-                        .toggleStyle(.switch).labelsHidden().tint(Theme.accent)
+                    AccentSwitch(isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunch($0) }))
                     if let e = model.launchError { Text(e).font(Theme.captionFont).foregroundStyle(Theme.inkMute) }
                 }
             }
@@ -186,7 +185,7 @@ struct SettingsView: View {
             }
             divider
             row("Show today's progress in the toolbar") {
-                Toggle("", isOn: $model.showMomentum).toggleStyle(.switch).labelsHidden().tint(Theme.accent)
+                AccentSwitch(isOn: $model.showMomentum)
             }
             divider
             VStack(alignment: .leading, spacing: Theme.s2) {
@@ -231,5 +230,18 @@ struct SettingsView: View {
             Spacer()
             content()
         }
+    }
+}
+
+/// Native switches ignore tint when ON on some macOS versions; draw our own (accent = the only blue).
+struct AccentSwitch: View {
+    @Binding var isOn: Bool
+    var body: some View {
+        Button { withAnimation(Theme.reduceMotion ? nil : .easeOut(duration: 0.15)) { isOn.toggle() } } label: {
+            Capsule().fill(isOn ? Theme.accent : Theme.hairline).frame(width: 38, height: 22)
+                .overlay(alignment: isOn ? .trailing : .leading) { Circle().fill(.white).frame(width: 18, height: 18).padding(2) }
+        }
+        .buttonStyle(.plain)
+        .accessibilityRepresentation { Toggle("", isOn: $isOn) }
     }
 }
