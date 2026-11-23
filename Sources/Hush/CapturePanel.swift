@@ -265,7 +265,8 @@ final class CaptureController {
         let host = NSHostingView(rootView: CaptureView(model: model, onHeight: { [weak self] h in self?.resize(height: h) }))
         panel.contentView = host
         place(panel, size: host.fittingSize)
-        NSApp.activate()
+        // No NSApp.activate(): a .nonactivatingPanel takes keystrokes without activating
+        // Hush, and activating would raise the outline window too (user-reported bug).
         panel.makeKeyAndOrderFront(nil)
         monitor = monitor ?? NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] e in
             nonisolated(unsafe) let ev = e
