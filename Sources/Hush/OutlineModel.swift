@@ -317,6 +317,9 @@ final class OutlineModel {
         selection = nil
     }
 
+    /// The persistent "New task" row: start a draft at the end of the current level.
+    func addAtEnd() { startDraft(parent: zoomRoot, after: zoomNodes.last?.id) }
+
     private func newSiblingBelow() {
         if let id = selection, let (parent, _) = siblings(of: id) { startDraft(parent: parent, after: id) }
         else if zoomRoot != nil || navRows.isEmpty { startDraft(parent: zoomRoot, after: nil) }

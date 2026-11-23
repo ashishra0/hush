@@ -49,30 +49,37 @@ struct ClosureView: View {
 
     @ViewBuilder private func card(_ summary: TodaySummary) -> some View {
         let n = summary.doneCount
-        VStack(alignment: .leading, spacing: Theme.s3) {
-            Text(Self.date(now)).font(.system(size: 10, design: .monospaced)).foregroundStyle(Theme.inkFaint)
-            Text(summary.copy.headline).font(.system(size: 28, weight: .light)).foregroundStyle(Theme.ink)
-            Text("\(n) \(n == 1 ? "thing" : "things") finished today.").font(Theme.bodyFont).foregroundStyle(Theme.inkMute)
+        VStack(alignment: .leading, spacing: 0) {
+            Text(Self.date(now)).font(.system(size: 11, design: .monospaced)).foregroundStyle(Theme.inkFaint)
+            Text(summary.copy.headline).font(.system(size: 28, weight: .light)).foregroundStyle(Theme.ink).padding(.top, Theme.s4)
+            Text("\(n) \(n == 1 ? "thing" : "things") finished today.").font(.system(size: 15)).foregroundStyle(Theme.inkMute).padding(.top, Theme.s2)
             if n > 0 {
                 HStack(spacing: 4) {
                     ForEach(0..<min(n, 8), id: \.self) { _ in
-                        RoundedRectangle(cornerRadius: 1).fill(Theme.ink).frame(width: 3, height: 14)
+                        RoundedRectangle(cornerRadius: 1.5).fill(Theme.ink).frame(width: 3, height: 14)
                     }
                 }
-                VStack(alignment: .leading, spacing: Theme.s1) {
+                .padding(.top, Theme.s4)
+                Rectangle().fill(Theme.hairline).frame(height: 1).padding(.top, Theme.s4)
+                VStack(alignment: .leading, spacing: Theme.s3) {
                     ForEach(Array(summary.latestTitles.prefix(3).enumerated()), id: \.offset) { _, t in
-                        Text(t).font(Theme.bodyFont).foregroundStyle(Theme.inkMute).lineLimit(1)
+                        HStack(spacing: Theme.s3) {
+                            Circle().fill(Theme.inkFaint.opacity(0.6)).frame(width: 12, height: 12)
+                            Text(t).font(Theme.bodyFont).foregroundStyle(Theme.inkMute).lineLimit(1)
+                        }
                     }
-                    if n > 3 { Text("and \(n - 3) more").font(Theme.captionFont).foregroundStyle(Theme.inkFaint) }
+                    if n > 3 { Text("and \(n - 3) more").font(Theme.captionFont).foregroundStyle(Theme.inkFaint).padding(.leading, 24) }
                 }
+                .padding(.top, Theme.s4)
             }
-            Text(summary.copy.closing).font(Theme.bodyFont.italic()).foregroundStyle(Theme.inkMute)
-            Rectangle().fill(Theme.hairline).frame(height: 1)
+            Text(summary.copy.closing).font(.system(size: 15).italic()).foregroundStyle(Theme.ink).padding(.top, Theme.s4)
+            Rectangle().fill(Theme.hairline).frame(height: 1).padding(.top, Theme.s4)
             HStack(spacing: Theme.s4) {
                 hint("↵", "Reflect"); Spacer(); hint("⌘Y", "History")
             }
+            .padding(.top, Theme.s3)
         }
-        .padding(Theme.s4)
+        .padding(Theme.s6 - 2)
         .frame(width: 340, alignment: .leading)
         .background(Theme.surface)
         .focusable()

@@ -44,6 +44,8 @@ final class OutlineWindowController: NSObject {
         return (m, w)
     }
 
+    var isVisible: Bool { window?.isVisible ?? false }
+
     func show() {
         let (_, w) = build()
         NSApp.activate()

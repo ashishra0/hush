@@ -66,16 +66,16 @@ struct ReflectionView: View {
     var body: some View {
         let list = entries(offset), n = list.count
         let copy = summaries.indices.contains(offset) ? summaries[offset].copy : ClosureCopy.choose(doneCount: 0, openCount: 1)
-        ZStack {
+        ZStack(alignment: .top) {
             Dk.ground.ignoresSafeArea()
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text(label).font(.system(size: 11, design: .monospaced)).foregroundStyle(Dk.inkFaint)
                 Text(copy.headline).font(.system(size: 64, weight: .light)).tracking(-1.6).foregroundStyle(Dk.ink)
-                    .scaleEffect(grown ? 1 : 28.0 / 64, anchor: .topLeading)
+                    .scaleEffect(grown ? 1 : 28.0 / 64, anchor: .topLeading).padding(.top, 28)
                 Text("\(n) \(n == 1 ? "thing" : "things") finished \(offset == 0 ? "today" : "that day").")
-                    .font(.system(size: 18)).foregroundStyle(Dk.inkMute)
+                    .font(.system(size: 18)).foregroundStyle(Dk.inkMute).padding(.top, 14)
                 if n > 0 {
-                    LazyVGrid(columns: [GridItem(.flexible(), alignment: .topLeading), GridItem(.flexible(), alignment: .topLeading)], alignment: .leading, spacing: 6) {
+                    LazyVGrid(columns: [GridItem(.flexible(), alignment: .topLeading), GridItem(.flexible(), alignment: .topLeading)], alignment: .leading, spacing: 10) {
                         ForEach(list.prefix(12)) { e in
                             HStack(alignment: .firstTextBaseline, spacing: 8) {
                                 Text(Self.time.string(from: e.task.completedAt ?? Date())).font(.system(size: 11, design: .monospaced))
@@ -84,17 +84,19 @@ struct ReflectionView: View {
                             }
                         }
                     }
+                    .padding(.top, 36)
                     if n > 12 { Text("and \(n - 12) more").font(.system(size: 12)).foregroundStyle(Dk.inkFaint) }
                 }
-                Text(copy.closing).font(.system(size: 20).italic()).foregroundStyle(Dk.ink)
-                Rectangle().fill(Dk.hairline).frame(height: 1).padding(.top, 8)
-                Text("THIS WEEK").font(.system(size: 10, design: .monospaced)).foregroundStyle(Dk.inkFaint)
+                Text(copy.closing).font(.system(size: 20).italic()).foregroundStyle(Dk.ink).padding(.top, 36)
+                Rectangle().fill(Dk.hairline).frame(height: 1).padding(.top, 36)
+                Text("THIS WEEK").font(.system(size: 10, design: .monospaced)).foregroundStyle(Dk.inkFaint).padding(.top, 24).padding(.bottom, 12)
                 WeekStrip(counts: week.enumerated().map { (cal.component(.weekday, from: $1.day), $1.count, $0 == week.count - 1) }, cal: cal)
-                Text("One dot per finished task. Rest days are just quiet.").font(.system(size: 12)).foregroundStyle(Dk.inkFaint)
+                Text("One dot per finished task. Rest days are just quiet. There are no numbers, goal lines, or comparisons.").font(.system(size: 12)).foregroundStyle(Dk.inkFaint).padding(.top, 12)
             }
             .id(offset)
             .transition(.opacity)
             .frame(width: 640, alignment: .leading)
+            .padding(.top, 180)
             VStack {
                 Spacer()
                 HStack(spacing: 20) { hint("esc", "Back to list"); hint("⌘Y", "History"); hint("← →", "Other days") }
@@ -137,6 +139,9 @@ struct ReflectionView: View {
     private func hint(_ k: String, _ l: String) -> some View {
         HStack(spacing: 6) {
             Text(k).font(.system(size: 11, design: .monospaced)).foregroundStyle(Dk.inkMute)
+                .padding(.horizontal, 6).frame(minWidth: 22, minHeight: 20)
+                .background(Color(red: 0x16 / 255, green: 0x16 / 255, blue: 0x18 / 255), in: RoundedRectangle(cornerRadius: 4))
+                .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Color(red: 0x2E / 255, green: 0x2E / 255, blue: 0x32 / 255), lineWidth: 1))
             Text(l).font(.system(size: 12)).foregroundStyle(Dk.inkFaint)
         }
     }

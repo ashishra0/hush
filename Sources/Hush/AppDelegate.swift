@@ -115,8 +115,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             popoverModel.shortcut = HotKey.shared.display
             popover.appearance = NSApp.appearance            // follow Settings' Light/Dark (nil = system)
             popover.contentViewController?.view.appearance = NSApp.appearance
-            NSApp.activate()
+            // No NSApp.activate(): that raises every Hush window (the outline) above other apps.
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            popover.contentViewController?.view.window?.makeKey()
         }
     }
 

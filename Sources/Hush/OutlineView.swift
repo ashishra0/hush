@@ -63,7 +63,8 @@ struct OutlineView: View {
                     if i > 0 { Text("/").foregroundStyle(Theme.inkFaint) }
                     let last = i == crumbs.count - 1
                     Button { if !last { model.zoom(toLevel: i) } } label: {
-                        Text(name).foregroundStyle(last ? Theme.ink : Theme.inkMute).lineLimit(1)
+                        Text(name).fontWeight(last ? .medium : .regular)
+                            .foregroundStyle(last ? Theme.ink : Theme.inkMute).lineLimit(1)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(last ? "Current level, \(name)" : "Go to \(name)")
@@ -90,7 +91,7 @@ struct OutlineView: View {
                 Spacer()
                 Text("\(model.openCount) open").font(Theme.captionFont).foregroundStyle(Theme.inkFaint)
             }
-            .padding(.horizontal, Theme.s2).padding(.top, 40).padding(.bottom, Theme.s4)
+            .padding(.leading, 32).padding(.trailing, Theme.s2).padding(.top, 45).padding(.bottom, 25)
 
             VStack(spacing: 0) {
                 ForEach(rows) { d in
@@ -108,6 +109,7 @@ struct OutlineView: View {
             .onPreferenceChange(RowFramesKey.self) { model.rowFrames = $0 }
             .overlay(alignment: .topLeading) { dragOverlay }
 
+            if !model.isFinding && model.draft == nil { AddRow(model: model) }
             if model.isFinding && model.realRows.isEmpty {
                 Text("No open tasks match “\(model.findQuery)”.")
                     .font(Theme.bodyFont).foregroundStyle(Theme.inkFaint)
@@ -144,12 +146,12 @@ struct OutlineView: View {
             ? [("⌘↵", "Done, show next"), ("↓", "Skip for now"), ("esc", "Back to outline")]
             : [("⇥", "Indent"), ("⇧⇥", "Outdent"), ("⌘↵", "Complete"), ("⌘.", "Collapse"),
                ("⌥⌘↑↓", "Move"), ("⌘]", "Zoom in"), ("⌘/", "All shortcuts")]
-        return HStack(spacing: Theme.s4) {
+        return HStack(spacing: 22) {
             Spacer()
             ForEach(items, id: \.0) { key, label in
                 HStack(spacing: 6) {
                     Keycap(text: key)
-                    Text(label).font(Theme.captionFont).foregroundStyle(Theme.inkMute)
+                    Text(label).font(.system(size: 12.5)).foregroundStyle(Theme.inkMute)
                 }
             }
             Spacer()
@@ -176,7 +178,7 @@ struct FindField: View {
                 .focused($focused)
                 .accessibilityLabel("Find in outline")
             if model.find.isEmpty {
-                Text("⌘F").font(Theme.keycapFont).foregroundStyle(Theme.inkFaint)
+                Text("⌘F").font(.system(size: 11)).foregroundStyle(Theme.inkFaint)
             } else {
                 Button { model.clearFind() } label: {
                     Image(systemName: "xmark.circle.fill").font(.system(size: 11)).foregroundStyle(Theme.inkFaint)
@@ -296,15 +298,35 @@ struct RowView: View {
 
     private var dragging: Bool { model.drag?.id == row.task?.id && !lifted }
     private var isDraft: Bool { row.task == nil }
-    private var selected: Bool { anim == nil && !lifted && !isDraft && model.selection == row.task?.id }
     private var editingMe: Bool {
         anim == nil && !lifted && model.editing == (isDraft ? .draft : .task(row.task!.id))
+    }
+    /// The single accent-wash row. Never while editing (Paper "editing": plain row), never an ancestor.
+    private var selected: Bool {
+        anim == nil && !lifted && !isDraft && model.editing == nil && model.selection == row.task?.id
     }
     private var interactive: Bool { anim == nil && !lifted && !model.isFinding }
 
     var body: some View {
+        ZStack(alignment: .leading) {
+            HStack(spacing: 0) {
+                Color.clear.frame(width: 24 * CGFloat(row.depth))   // indent sits outside the wash
+                rowBody
+            }
+            if !lifted { guides }
+        }
+        .opacity(dragging ? 0.35 : 1)
+        .contentShape(Rectangle())
+        .onTapGesture { if let id = row.task?.id { model.click(id) } }
+        .onHover { hover = $0 }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(a11yLabel)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    /// [chevron 16][circle 16][text flex][trailing]
+    private var rowBody: some View {
         HStack(alignment: .top, spacing: 0) {
-            Color.clear.frame(width: 24 * CGFloat(row.depth))
             chevron.frame(width: 16, height: 22)
             Color.clear.frame(width: 8)
             marker.frame(width: 16, height: 22)
@@ -312,7 +334,8 @@ struct RowView: View {
             label.frame(maxWidth: .infinity, alignment: .leading)
             Color.clear.frame(width: Theme.s2)
             if let t = row.task, t.collapsed, row.childCount > 0, anim == nil {
-                Text("\(row.descendantCount)").font(Theme.captionFont).foregroundStyle(Theme.inkFaint)
+                Text(selected || hover ? "\(row.descendantCount) inside" : "\(row.descendantCount)")
+                    .font(Theme.captionFont).foregroundStyle(Theme.inkFaint)
                     .frame(height: 22)
             }
             if let t = row.task, !t.isInbox, interactive { handle(t.id) }
@@ -322,18 +345,10 @@ struct RowView: View {
         .frame(minHeight: Theme.rowHeight, alignment: .top)
         .background {
             RoundedRectangle(cornerRadius: Theme.rRow)
-                .fill(lifted ? Theme.surface : selected || editingMe ? Theme.accentWash : hover ? Theme.surfaceSunk : .clear)
+                .fill(lifted ? Theme.surface : selected ? Theme.accentWash : hover && !editingMe && anim == nil ? Theme.surfaceSunk : .clear)
                 .shadow(color: .black.opacity(lifted ? 0.18 : 0), radius: 12, y: 6)   // shadow on the shape only, never the text
         }
         .overlay(RoundedRectangle(cornerRadius: Theme.rRow).strokeBorder(lifted ? Theme.hairline : .clear, lineWidth: 1))
-        .overlay(alignment: .leading) { if !lifted { guides } }
-        .opacity(dragging ? 0.35 : 1)
-        .contentShape(Rectangle())
-        .onTapGesture { if let id = row.task?.id { model.click(id) } }
-        .onHover { hover = $0 }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(a11yLabel)
-        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private var a11yLabel: String {
@@ -390,9 +405,11 @@ struct RowView: View {
         if row.task?.isInbox == true {
             Image(systemName: "folder").font(.system(size: 13)).foregroundStyle(selected ? Theme.accent : Theme.inkMute)
                 .frame(height: 22)
+        } else if isDraft {
+            DashedCircle().frame(width: 16, height: 22)
         } else {
             let circle = ZStack {
-                Circle().strokeBorder(selected || editingMe ? Theme.accent : Theme.inkFaint, lineWidth: 1.5)
+                Circle().strokeBorder(selected ? Theme.accent : Theme.inkFaint, lineWidth: 1.5)
                 if let a = anim {
                     Circle().fill(Theme.accent).opacity(a.fill * (1 - a.fade))
                     Circle().fill(Theme.inkFaint).opacity(a.fill * a.fade)
@@ -443,6 +460,34 @@ struct RowView: View {
     }
 }
 
+struct DashedCircle: View {
+    var body: some View {
+        Circle().strokeBorder(Theme.inkFaint.opacity(0.7), style: StrokeStyle(lineWidth: 1.5, dash: [2.5, 2.5]))
+            .frame(width: 16, height: 16).frame(height: 22)
+    }
+}
+
+/// Persistent ghost row at the end of a level (Paper outline): click to start a new task there.
+struct AddRow: View {
+    let model: OutlineModel
+    @State private var hover = false
+    var body: some View {
+        Button { model.addAtEnd() } label: {
+            HStack(spacing: 8) {
+                Color.clear.frame(width: 16)
+                DashedCircle().frame(width: 16)
+                Text("New task").font(Theme.rowFont).foregroundStyle(Theme.inkFaint.opacity(hover ? 1 : 0.8))
+                Spacer()
+            }
+            .padding(.horizontal, 8).frame(height: Theme.rowHeight)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hover = $0 }
+        .accessibilityLabel("New task")
+    }
+}
+
 struct ToastView: View {
     let toast: Toast
     let model: OutlineModel
@@ -451,12 +496,17 @@ struct ToastView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Text("Done · \(toast.title)").lineLimit(1)
-            Text("⌘Z Undo").font(Theme.keycapFont).opacity(0.6)
+            (Text("Done").fontWeight(.medium) + Text(" · \(toast.title)").foregroundColor(Theme.surface.opacity(0.6)))
+                .lineLimit(1)
+            HStack(spacing: 6) {
+                Text("⌘Z").font(.system(size: 11)).padding(.horizontal, 5).frame(height: 18)
+                    .background(Theme.surface.opacity(0.14), in: RoundedRectangle(cornerRadius: 4))
+                Text("Undo")
+            }
         }
         .font(Theme.bodyFont)
         .foregroundStyle(Theme.surface)
-        .padding(.horizontal, Theme.s4).padding(.vertical, 10)
+        .padding(.leading, Theme.s4).padding(.trailing, Theme.s3).padding(.vertical, 8)
         .background { Capsule().fill(Theme.ink).shadow(color: .black.opacity(0.2), radius: 12, y: 6) }
         .offset(y: shown || Theme.reduceMotion ? 0 : 8)   // rise 8px / 160ms; opacity only with Reduce Motion
         .opacity(shown ? 1 : 0)
@@ -662,6 +712,26 @@ struct ShortcutsSheet: View {
 
 // MARK: Inline editor
 
+/// Field editor whose caret is only as tall as the text (Paper: a slim accent caret, not a full-row bar).
+final class CaretTextView: NSTextView {
+    override func drawInsertionPoint(in rect: NSRect, color: NSColor, turnedOn flag: Bool) {
+        var r = rect
+        let h = min(rect.height, ceil((font ?? .systemFont(ofSize: 15)).boundingRectForFont.height))
+        r.origin.y += (rect.height - h) / 2
+        r.size.height = h
+        super.drawInsertionPoint(in: r, color: color, turnedOn: flag)
+    }
+}
+
+final class CaretCell: NSTextFieldCell {
+    private let editor: CaretTextView = { let t = CaretTextView(); t.isFieldEditor = true; return t }()
+    override func fieldEditor(for controlView: NSView) -> NSTextView? { editor }
+}
+
+final class EditTextField: NSTextField {
+    override class var cellClass: AnyClass? { get { CaretCell.self } set {} }
+}
+
 /// Wrapping NSTextField: gives us caret position (split at caret), accent caret and exact key commands.
 struct EditField: NSViewRepresentable {
     let model: OutlineModel
@@ -671,7 +741,7 @@ struct EditField: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(model: model, editing: editing) }
 
     func makeNSView(context: Context) -> NSTextField {
-        let f = NSTextField(string: model.editText)
+        let f = EditTextField(string: model.editText)
         f.isBordered = false
         f.drawsBackground = false
         f.focusRingType = .none

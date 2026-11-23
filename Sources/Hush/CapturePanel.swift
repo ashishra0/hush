@@ -97,10 +97,10 @@ struct CaptureView: View {
             Rectangle().fill(Theme.hairline).frame(height: 1)
             HStack(spacing: Theme.s4) {
                 Label(model.destinationName, systemImage: "folder")
-                    .font(Theme.captionFont)
+                    .font(.system(size: 13))
                     .foregroundStyle(Theme.inkMute)
                 Spacer()
-                if model.expanded { hint("⇧⇥", "Title"); hint("⌘↵", "Save") } else { hint("⇥", "Details"); hint("↵", "Save") }
+                if model.expanded { hint("⇧⇥", "Title"); hint("⌘↵", "Save", primary: true) } else { hint("⇥", "Details"); hint("↵", "Save", primary: true) }
             }
             .padding(.horizontal, Theme.s6)
             .padding(.vertical, 10)
@@ -173,10 +173,11 @@ struct CaptureView: View {
         }
     }
 
-    private func hint(_ key: String, _ label: String) -> some View {
-        HStack(spacing: 6) {
+    private func hint(_ key: String, _ label: String, primary: Bool = false) -> some View {
+        HStack(spacing: 8) {
             Keycap(text: key)
-            Text(label).font(Theme.captionFont).foregroundStyle(Theme.inkMute)
+            Text(label).font(.system(size: 13, weight: primary ? .medium : .regular))
+                .foregroundStyle(primary ? Theme.ink : Theme.inkMute)
         }
     }
 }

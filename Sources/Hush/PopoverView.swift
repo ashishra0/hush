@@ -27,14 +27,15 @@ struct PopoverView: View {
     var body: some View {
         VStack(spacing: 0) {
             Button(action: model.onCapture) {
-                HStack {
-                    Text("Capture a task…").font(Theme.bodyFont).foregroundStyle(Theme.inkFaint)
+                HStack(spacing: 10) {
+                    Image(systemName: "plus").font(.system(size: 13, weight: .regular)).foregroundStyle(Theme.inkMute)
+                    Text("Capture a task…").font(.system(size: 14)).foregroundStyle(Theme.inkFaint)
                     Spacer()
-                    Keycap(text: model.shortcut)
+                    Text(model.shortcut).font(.system(size: 12)).foregroundStyle(Theme.inkFaint)
                 }
                 .padding(.horizontal, Theme.s3)
                 .frame(height: 36)
-                .background(Theme.surfaceSunk, in: RoundedRectangle(cornerRadius: 8))
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8))
                 .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.hairline, lineWidth: 1))
                 .contentShape(Rectangle())
             }
@@ -42,13 +43,13 @@ struct PopoverView: View {
             .padding(Theme.s3)
 
             HStack {
-                Text("RECENT").font(Theme.keycapFont).tracking(0.6)
+                Text("RECENT").font(.system(size: 11)).tracking(1.1)
                 Spacer()
-                if model.openCount > 0 { Text("\(model.recent.count) of \(model.openCount) open").font(Theme.captionFont) }
+                if model.openCount > 0 { Text("\(model.recent.count) of \(model.openCount) open").font(.system(size: 12.5)) }
             }
             .foregroundStyle(Theme.inkFaint)
-            .padding(.horizontal, Theme.s4)
-            .padding(.bottom, Theme.s1)
+            .padding(.horizontal, Theme.s4 + 2)
+            .padding(.top, 2).padding(.bottom, Theme.s2)
 
             if model.recent.isEmpty {
                 Text("All clear.")
@@ -70,13 +71,13 @@ struct PopoverView: View {
                     .keyboardShortcut("o", modifiers: .command)
                 FooterRow(title: "Settings…", keys: "⌘,", action: model.onSettings)
                     .keyboardShortcut(",", modifiers: .command)
-                FooterRow(title: "Quit Hush", keys: "⌘Q", action: model.onQuit)
+                FooterRow(title: "Quit Hush", keys: "⌘Q", muted: true, action: model.onQuit)
                     .keyboardShortcut("q", modifiers: .command)
             }
             .padding(Theme.s2)
         }
         .frame(width: 320)
-        .background(Theme.surface)
+        .background(Theme.popover)
     }
 }
 
@@ -94,9 +95,9 @@ private struct RecentRow: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Complete \(task.title)")
-            Text(task.title).font(.system(size: 13)).foregroundStyle(Theme.ink).lineLimit(1)
+            Text(task.title).font(.system(size: 14)).foregroundStyle(Theme.ink).lineLimit(1)
             Spacer(minLength: Theme.s2)
-            Text(Self.relative(task.createdAt)).font(Theme.captionFont).foregroundStyle(Theme.inkFaint)
+            Text(Self.relative(task.createdAt)).font(.system(size: 12.5)).foregroundStyle(Theme.inkFaint)
         }
         .padding(.horizontal, Theme.s2)
         .frame(height: 30)
@@ -121,17 +122,18 @@ private struct RecentRow: View {
 private struct FooterRow: View {
     let title: String
     let keys: String
+    var muted = false
     let action: () -> Void
     @State private var hover = false
 
     var body: some View {
         Button(action: action) {
             HStack {
-                Text(title).font(Theme.bodyFont).foregroundStyle(Theme.ink)
+                Text(title).font(Theme.bodyFont).foregroundStyle(muted ? Theme.inkMute : Theme.ink)
                 Spacer()
-                Text(keys).font(Theme.keycapFont).foregroundStyle(Theme.inkFaint)
+                Text(keys).font(.system(size: 12)).foregroundStyle(Theme.inkFaint)
             }
-            .padding(.horizontal, Theme.s2)
+            .padding(.horizontal, Theme.s3)
             .frame(height: 28)
             .background(hover ? Theme.surfaceSunk : .clear, in: RoundedRectangle(cornerRadius: Theme.rRow))
             .contentShape(Rectangle())

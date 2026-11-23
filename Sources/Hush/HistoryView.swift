@@ -26,11 +26,13 @@ enum HistoryLayout {
             if missing.count == 1 {
                 out.append(section(missing[0], [], today: today, cal: cal))
             } else if missing.count == 2, cal.component(.weekday, from: missing[0]) == 1, cal.component(.weekday, from: missing[1]) == 7 {
-                out.append(HistorySection(id: missing[1], title: header(missing[1], today: today, cal: cal), right: "A quiet weekend", entries: []))
+                out.append(HistorySection(id: missing[1], title: weekendTitle(missing[1], cal), right: "A quiet weekend", entries: []))
             }
         }
         return out
     }
+
+    private static func weekendTitle(_ sat: Date, _ cal: Calendar) -> String { "Saturday – Sunday" }
 
     private static func section(_ day: Date, _ entries: [HistoryEntry], today: Date, cal: Calendar) -> HistorySection {
         HistorySection(id: day, title: header(day, today: today, cal: cal),
@@ -99,7 +101,6 @@ struct HistoryView: View {
         let sections = searching ? HistoryLayout.sections(model.shown, now: Date(), calendar: cal).filter { !$0.entries.isEmpty } : HistoryLayout.sections(model.shown, now: Date(), calendar: cal)
         VStack(spacing: 0) {
             toolbar
-            Rectangle().fill(Theme.hairline).frame(height: 1)
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
@@ -119,7 +120,8 @@ struct HistoryView: View {
                                 Text(sec.right).font(Theme.captionFont).foregroundStyle(Theme.inkFaint)
                             }
                             .padding(.horizontal, Theme.s2)
-                            .padding(.top, Theme.s4).padding(.bottom, Theme.s1)
+                            .padding(.top, Theme.s4).padding(.bottom, Theme.s2)
+                            Rectangle().fill(Theme.hairline).frame(height: 1)
                             ForEach(sec.entries) { e in
                                 HistoryRow(entry: e, time: Self.time.string(from: e.task.completedAt ?? Date()),
                                            selected: model.selected == e.id,
@@ -167,6 +169,7 @@ struct HistoryView: View {
                     .onKeyPress(.escape) { model.query = ""; finding = false; focused = true; return .handled }
                     .onSubmit { finding = false; focused = true }
                     .accessibilityLabel("Find finished")
+                Text("⌘F").font(Theme.keycapFont).foregroundStyle(Theme.inkFaint)
             }
             .padding(.horizontal, Theme.s2).frame(width: 200, height: 26)
             .background(Theme.surfaceSunk, in: RoundedRectangle(cornerRadius: Theme.rRow))
@@ -187,27 +190,33 @@ private struct HistoryRow: View {
     @State private var hover = false
 
     var body: some View {
+        let active = hover || selected
         HStack(spacing: Theme.s3) {
-            Image(systemName: "checkmark.circle.fill").font(.system(size: 15)).foregroundStyle(Theme.inkFaint)
-            Text(entry.task.title).font(Theme.rowFont).foregroundStyle(Theme.inkMute).lineLimit(1)
-            if !entry.path.isEmpty {
-                Text(entry.path.joined(separator: " › ")).font(Theme.captionFont).foregroundStyle(Theme.inkFaint).lineLimit(1)
-            }
+            Image(systemName: "checkmark.circle.fill").font(.system(size: 15))
+                .foregroundStyle(active ? Theme.inkMute : Theme.inkFaint)
+            Text(entry.task.title).font(Theme.rowFont).foregroundStyle(active ? Theme.ink : Theme.inkMute).lineLimit(1)
             Spacer(minLength: Theme.s2)
-            if hover || selected {
+            if active {
                 Button(action: restore) {
                     HStack(spacing: 6) {
-                        Text("Restore").font(Theme.captionFont).foregroundStyle(Theme.ink)
-                        Keycap(text: "⌘R")
+                        Image(systemName: "arrow.uturn.backward").font(.system(size: 10))
+                        Text("Restore").font(Theme.captionFont)
+                        Text("⌘R").font(Theme.keycapFont).foregroundStyle(Theme.inkFaint)
                     }
+                    .foregroundStyle(Theme.ink)
+                    .padding(.horizontal, 8).frame(height: 22)
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.rKeycap))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.rKeycap).strokeBorder(Theme.hairline, lineWidth: 1))
                 }
                 .buttonStyle(.plain)
+            } else if !entry.path.isEmpty {
+                Text(entry.path.joined(separator: " › ")).font(Theme.captionFont).foregroundStyle(Theme.inkFaint).lineLimit(1)
             }
-            Text(time).font(Theme.keycapFont).foregroundStyle(Theme.inkFaint)
+            Text(time).font(Theme.keycapFont).foregroundStyle(Theme.inkFaint).fixedSize().frame(minWidth: 64, alignment: .trailing)
         }
         .padding(.horizontal, Theme.s2)
         .frame(height: Theme.rowHeight)
-        .background(selected ? Theme.accentWash : (hover ? Theme.surfaceSunk : .clear), in: RoundedRectangle(cornerRadius: Theme.rRow))
+        .background(active ? Theme.surfaceSunk : .clear, in: RoundedRectangle(cornerRadius: Theme.rRow))
         .contentShape(Rectangle())
         .onHover { hover = $0 }
         .accessibilityElement(children: .ignore)

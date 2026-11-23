@@ -148,14 +148,14 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.s6) {
-            row("Capture shortcut") {
+            row("Capture shortcut", "Works from any app") {
                 VStack(alignment: .trailing, spacing: Theme.s1) {
                     HStack(spacing: Theme.s2) {
                         Button(action: model.toggleRecording) {
-                            Text(model.recording ? "Type shortcut…" : model.shortcut)
-                                .font(Theme.keycapFont)
+                            Text(model.recording ? "Type shortcut…" : Self.spaced(model.shortcut))
+                                .font(.system(size: 14, design: .monospaced))
                                 .foregroundStyle(model.recording ? Theme.accent : Theme.ink)
-                                .padding(.horizontal, Theme.s3).frame(height: 26)
+                                .padding(.horizontal, Theme.s4).frame(height: 30)
                                 .background(Theme.surfaceSunk, in: RoundedRectangle(cornerRadius: Theme.rKeycap))
                                 .overlay(RoundedRectangle(cornerRadius: Theme.rKeycap)
                                     .strokeBorder(model.recording ? Theme.accent : Theme.hairline, lineWidth: 1))
@@ -168,7 +168,7 @@ struct SettingsView: View {
                 }
             }
             divider
-            row("Launch at login") {
+            row("Launch at login", "Starts quietly in the menu bar") {
                 VStack(alignment: .trailing, spacing: Theme.s1) {
                     AccentSwitch(isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunch($0) }))
                     if let e = model.launchError { Text(e).font(Theme.captionFont).foregroundStyle(Theme.inkMute) }
@@ -176,7 +176,7 @@ struct SettingsView: View {
             }
             divider
             VStack(alignment: .leading, spacing: Theme.s3) {
-                Text("Appearance").font(Theme.bodyFont).foregroundStyle(Theme.ink)
+                Text("Appearance").font(.system(size: 15)).foregroundStyle(Theme.ink)
                 HStack(spacing: Theme.s3) {
                     tile("system", "System")
                     tile("light", "Light")
@@ -184,15 +184,22 @@ struct SettingsView: View {
                 }
             }
             divider
-            row("Show today's progress in the toolbar") {
+            row("Show today's progress in the toolbar", "A few marks and a count, next to Find") {
                 AccentSwitch(isOn: $model.showMomentum)
             }
             divider
-            VStack(alignment: .leading, spacing: Theme.s2) {
-                Text("Your tasks live on this Mac").font(Theme.bodyFont).foregroundStyle(Theme.ink)
-                Text(model.dbPath).font(Theme.keycapFont).foregroundStyle(Theme.inkMute)
-                    .textSelection(.enabled).lineLimit(2)
-                Button("Show in Finder", action: model.showInFinder).buttonStyle(.link).font(Theme.captionFont)
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Your tasks live on this Mac").font(.system(size: 15)).foregroundStyle(Theme.ink)
+                    Text(model.dbPath).font(Theme.keycapFont).foregroundStyle(Theme.inkMute).textSelection(.enabled).lineLimit(2)
+                }
+                Spacer()
+                Button(action: model.showInFinder) {
+                    Text("Show in Finder").font(.system(size: 13)).foregroundStyle(Theme.ink)
+                        .padding(.horizontal, Theme.s3).frame(height: 28)
+                        .background(Theme.surfaceSunk, in: RoundedRectangle(cornerRadius: Theme.rRow))
+                        .overlay(RoundedRectangle(cornerRadius: Theme.rRow).strokeBorder(Theme.hairline, lineWidth: 1))
+                }.buttonStyle(.plain)
             }
         }
         .padding(.horizontal, Theme.s6).padding(.bottom, Theme.s6).padding(.top, 52)
@@ -200,33 +207,55 @@ struct SettingsView: View {
         .background(Theme.surface)
     }
 
+    /// "⇧⌘Space" -> "⌘  ⇧  Space" (modifiers spaced, ⌘ first, as in the design).
+    private static func spaced(_ d: String) -> String {
+        let mods = "⌃⌥⇧⌘"
+        let m = d.filter { mods.contains($0) }, key = String(d.drop { mods.contains($0) })
+        return (["⌘", "⇧", "⌥", "⌃"].filter { m.contains($0) } + [key]).joined(separator: "  ")
+    }
+
     private func tile(_ tag: String, _ label: String) -> some View {
-        let light = Color(white: 0.97), dark = Color(white: 0.12)
+        // Fixed preview colours (grounds/surfaces of each mode), independent of the current appearance.
+        let lg = Color(red: 0xEB / 255, green: 0xEB / 255, blue: 0xEB / 255), ls = Color.white
+        let dg = Color(red: 0x0B / 255, green: 0x0B / 255, blue: 0x0C / 255), ds = Color(red: 0x1A / 255, green: 0x1A / 255, blue: 0x1C / 255)
+        let le = Color(red: 0xDC / 255, green: 0xDC / 255, blue: 0xDF / 255), de = Color(red: 0x2E / 255, green: 0x2E / 255, blue: 0x32 / 255)
         let on = model.appearance == tag
+        func field(_ surface: Color, _ edge: Color, caret: Bool, scale: CGFloat = 1) -> some View {
+            RoundedRectangle(cornerRadius: 5).fill(surface).frame(width: 80 * scale, height: 20 * scale)
+                .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(edge, lineWidth: 1))
+                .overlay(alignment: .leading) { if caret { Capsule().fill(Theme.accent).frame(width: 1.5, height: 10).padding(.leading, 6) } }
+        }
         return Button { model.setAppearance(tag) } label: {
-            VStack(spacing: Theme.s1) {
+            VStack(spacing: Theme.s3) {
                 ZStack {
-                    if tag == "system" {
-                        HStack(spacing: 0) { light; dark }
-                    } else { tag == "light" ? light : dark }
-                    VStack(alignment: .leading, spacing: 4) {
-                        Capsule().frame(width: 40, height: 4); Capsule().frame(width: 28, height: 4)
+                    switch tag {
+                    case "system":
+                        HStack(spacing: 0) {
+                            ZStack { lg; field(ls, le, caret: false, scale: 0.55) }
+                            ZStack { dg; field(ds, de, caret: false, scale: 0.55) }
+                        }
+                    case "light": ZStack { lg; field(ls, le, caret: true) }
+                    default: ZStack { dg; field(ds, de, caret: true) }
                     }
-                    .foregroundStyle(tag == "dark" ? Color.white.opacity(0.5) : tag == "light" ? Color.black.opacity(0.3) : Color.gray)
                 }
-                .frame(height: 64)
-                .clipShape(RoundedRectangle(cornerRadius: Theme.rRow))
-                .overlay(RoundedRectangle(cornerRadius: Theme.rRow).strokeBorder(on ? Theme.ink : Theme.hairline, lineWidth: on ? 2 : 1))
-                Text(label).font(Theme.captionFont).foregroundStyle(on ? Theme.ink : Theme.inkMute)
+                .frame(height: 72)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.rPopover))
+                .overlay(RoundedRectangle(cornerRadius: Theme.rPopover).strokeBorder(on ? Theme.ink : Theme.hairline, lineWidth: on ? 2 : 1))
+                Text(label).font(.system(size: 13, weight: on ? .semibold : .regular)).foregroundStyle(on ? Theme.ink : Theme.inkFaint)
             }
-        }.buttonStyle(.plain).frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.plain).frame(maxWidth: .infinity)
+        .accessibilityLabel("\(label) appearance").accessibilityAddTraits(on ? .isSelected : [])
     }
 
     private var divider: some View { Rectangle().fill(Theme.hairline).frame(height: 1) }
 
-    private func row<C: View>(_ label: String, @ViewBuilder _ content: () -> C) -> some View {
-        HStack(alignment: .top) {
-            Text(label).font(Theme.bodyFont).foregroundStyle(Theme.ink)
+    private func row<C: View>(_ label: String, _ sub: String? = nil, @ViewBuilder _ content: () -> C) -> some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label).font(.system(size: 15)).foregroundStyle(Theme.ink)
+                if let sub { Text(sub).font(.system(size: 13)).foregroundStyle(Theme.inkFaint) }
+            }
             Spacer()
             content()
         }

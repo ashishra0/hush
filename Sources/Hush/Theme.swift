@@ -18,6 +18,8 @@ enum Theme {
     static let nsInk = nsDyn(0x1C1C1E, 0xF2F2F3)
     static let nsAccent = nsDyn(0x0852FF, 0x3D7BFF)
 
+    /// Popover body (a hair off the surface so the white capture field reads as a field).
+    static let popover = dyn(0xFAFAFA, 0x161618)
     static let ground = dyn(0xEBEBEB, 0x0B0B0C)
     static let surface = dyn(0xFFFFFF, 0x1A1A1C)
     static let surfaceSunk = dyn(0xF5F5F6, 0x232326)
@@ -43,15 +45,17 @@ enum Theme {
     static var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
 }
 
+/// Inline keycap (Paper "Keyboard shortcut indicators"): SF Pro glyphs, 20 high, 22+ wide, surface-sunk + 1px hairline.
 struct Keycap: View {
     let text: String
     var body: some View {
         Text(text)
-            .font(Theme.keycapFont)
+            .font(.system(size: 12, weight: .regular))
             .foregroundStyle(Theme.inkMute)
-            .padding(.horizontal, 5)
-            .frame(minWidth: 18, minHeight: 18)
+            .padding(.horizontal, 6)
+            .frame(minWidth: 22, minHeight: 20)
             .background(Theme.surfaceSunk, in: RoundedRectangle(cornerRadius: Theme.rKeycap))
             .overlay(RoundedRectangle(cornerRadius: Theme.rKeycap).strokeBorder(Theme.hairline, lineWidth: 1))
+            .accessibilityLabel(text)
     }
 }
