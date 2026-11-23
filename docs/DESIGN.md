@@ -46,3 +46,37 @@ NEVER: percentages, streaks, goals, comparisons, notifications, sounds, confetti
 
 ## Keyboard (global)
 ⌘⇧Space capture (rebindable). Outline: ↑↓ select · ↵ new sibling below (in edit: split at caret) · ⇥/⇧⇥ indent/outdent · ⌘↵ complete · ⌘./⌘→ collapse/expand · ⌥⌘↑↓ reorder within siblings · ⌘]/⌘[ zoom in/out · Space/typing edit, Esc stop editing · ⌘⌫ delete (undoable) · ⌘Z/⇧⌘Z · ⌘F find · ⌘Y history · ⌘D today.
+
+---
+# Post-MVP (M4) — from Paper pages 5–8
+
+## Quiet Momentum (Settings toggle "Show today's progress in the toolbar", default OFF)
+Outline toolbar, right of Find: marks + "N today" (12 ink-mute). Marks = 3×11 rounded bars, 3px gap, ink-mute, cap 8 (count text keeps going). New mark on completion: scaleY 0→1 at +90ms of Strike & Fold, accent → ink-mute over 600ms. Click (or ⌘D) opens the Daily Closure card anchored to the marks. Hidden when 0.
+
+## Find (⌘F) — outline toolbar field (200w, 26h, surface-sunk, r6, magnifier, "Find", ⌘F hint)
+Typing filters the outline to matching open tasks (case-insensitive substring) shown with their ancestors (ancestors ink-faint, matches ink, match substring bold). ↑↓ moves among matches, ↵ jumps: clears find, reveals (expands ancestors) and selects the task. Esc clears and returns focus to the outline. Empty result: "No open tasks match “q”." in ink-faint. History window keeps its own find field ("Find finished") with the same behavior over history rows.
+
+## Full-screen reflection (↵ on Daily Closure card = "Reflect")
+Borderless window filling the active screen, dk-ground #0B0B0C regardless of appearance (it's an evening ritual). Centered 640w column:
+- mono caps 11 "MONDAY · 23 NOVEMBER · 6:42 PM" (dk-ink-faint)
+- headline 64 light, −2.5%, dk-ink (ClosureCopy headline)
+- "N things finished today." 18 dk-ink-mute
+- Two-column list of today's finished tasks: time (mono 11 dk-ink-faint, 40w) + title (14 #C7C7CC). Max 12, then "and N more".
+- closing line italic 20 dk-ink
+- hairline (#1F1F22) then "THIS WEEK" mono caps 10 + week strip: 7 columns (previous 6 days + Today), each a vertical stack of 4px dots (3px gap, one per finished task, cap 12) above a 12pt day label; past days #5A5A5F, Today dots+label #F2F2F3 semibold "Today"; zero days show only the label. Caption 12 #5A5A5F "One dot per finished task. Rest days are just quiet."
+- Bottom hints (absolute, 50px from bottom): esc Back to list · ⌘Y History · ← → Other days.
+← / → browse previous/next days (not beyond today); headline/count/list/date update for that day ("A quiet day." copy when 0). Transition: card headline grows 28→64 as window cross-dissolves in 320ms; Reduce Motion = 150ms fade. Esc closes.
+
+## Focus Mode (⌘⇧F on a selected row, or from the row's context)
+The outline window content switches to focus (same window). Toolbar shows only dimmed traffic lights + centered mono caps "FOCUS". Ghost outline rows above/below at 10% opacity. Centered 640w: breadcrumb (12 ink-faint "Work › Launch v1.2 › Release notes"), row: 28px circle (2px accent stroke) + title 44 light −2.5% ink, note below (15/23 ink-mute, indented 48). Bottom "Up next  <title>" (12, faint+mute). Hint bar: ⌘↵ Done, show next · ↓ Skip for now · esc Back to outline.
+"Next" = next open task in outline pre-order after the focused one, starting where you entered (skipping Inbox node itself; wraps no). Complete: circle fills accent + strike (160ms) → task lifts −24px & fades while next rises +24px & fades in (200ms, 80ms overlap). Nothing left: "That's everything." (24 light) + "N finished in this focus session" (12 ink-faint) — the only place a session count appears. Esc (or ⌘⇧F) exits to the outline with the last focused/next task selected. Reduce Motion: crossfade only.
+
+## Shortcuts sheet (⌘/ in the outline)
+Sheet over the outline window (480w, r14, surface, hairline): title "Keyboard" (20 semibold) and grouped two-column rows (keycap ⇢ action): Capture · Outline · Views (⌘F Find, ⌘Y History, ⌘D Today, ⌘⇧F Focus, ⌘/ This sheet). Esc closes. Re-add "⌘/ All shortcuts" to the outline hint bar.
+
+## Polish bar (applies everywhere)
+- Light AND dark verified against tokens; no hard-coded colors outside Theme.
+- Every window: correct min sizes, remembers frame (setFrameAutosaveName), Esc behavior consistent, ⌘W closes, focus ring/selection always visible.
+- VoiceOver labels on circles ("Complete <title>"), rows ("<title>, level N, N open inside, collapsed"), toolbar marks ("N finished today").
+- Text never clips: long titles truncate with … in popover/history, wrap in outline (row grows in 22pt steps).
+- No layout jumps on launch; app launches < 300ms to menu bar.
