@@ -139,10 +139,11 @@ struct HistoryView: View {
             }
         }
         .background(Theme.surface)
+        .ignoresSafeArea(.container, edges: .top)
         .focusable()
         .focused($focused)
         .focusEffectDisabled()
-        .onAppear { focused = true }
+        .onAppear { DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { finding = false; focused = true } }
         .onKeyPress(.upArrow) { model.move(-1); return .handled }
         .onKeyPress(.downArrow) { model.move(1); return .handled }
         .onKeyPress(.escape) { model.onClose(); return .handled }
@@ -163,7 +164,7 @@ struct HistoryView: View {
                 Image(systemName: "magnifyingglass").font(.system(size: 11)).foregroundStyle(Theme.inkFaint)
                 TextField("", text: $model.query, prompt: Text("Find finished").foregroundColor(Theme.inkFaint))
                     .textFieldStyle(.plain).font(Theme.captionFont).foregroundStyle(Theme.ink).tint(Theme.accent)
-                    .focused($finding)
+                    .focused($finding).focusEffectDisabled()
                     .onKeyPress(.upArrow) { model.move(-1); return .handled }
                     .onKeyPress(.downArrow) { model.move(1); return .handled }
                     .onKeyPress(.escape) { model.query = ""; finding = false; focused = true; return .handled }
@@ -174,10 +175,10 @@ struct HistoryView: View {
             .padding(.horizontal, Theme.s2).frame(width: 200, height: 26)
             .background(Theme.surfaceSunk, in: RoundedRectangle(cornerRadius: Theme.rRow))
             .overlay(RoundedRectangle(cornerRadius: Theme.rRow).strokeBorder(finding ? Theme.accent : .clear, lineWidth: 1))
-            .padding(.trailing, Theme.s4)
+            .padding(.trailing, 20)
         }
         .font(Theme.bodyFont)
-        .padding(.leading, 80) // clear the traffic lights
+        .padding(.leading, 92) // clear the traffic lights
         .frame(height: 52)
     }
 }

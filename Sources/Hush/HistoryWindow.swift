@@ -29,6 +29,8 @@ final class HistoryWindowController {
             w.contentMinSize = NSSize(width: 640, height: 400)
             w.titleVisibility = .hidden
             w.titlebarAppearsTransparent = true
+            w.toolbar = NSToolbar(identifier: "history") // unified 52pt titlebar, lights centred
+            w.toolbarStyle = .unified
             w.isReleasedWhenClosed = false
             w.contentView = NSHostingView(rootView: HistoryView(model: model))
             w.setFrameAutosaveName("HushHistory")
@@ -40,5 +42,8 @@ final class HistoryWindowController {
         }
         NSApp.activate()
         window?.makeKeyAndOrderFront(nil)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in // list, not the Find field, owns focus on open
+            if let w = self?.window { w.makeFirstResponder(w.contentView) }
+        }
     }
 }
