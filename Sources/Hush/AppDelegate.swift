@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var store: TaskStore!
     private var menuBarSub: Subscription?
+    private var outline: OutlineWindowController!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         if let id = Bundle.main.bundleIdentifier,
@@ -17,7 +18,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.terminate(nil) // a copy is already running: one menu bar item only
             return
         }
-        do { store = try TaskStore(path: TaskStore.defaultURL().path) } catch {
+        do {
+            let env = ProcessInfo.processInfo.environment
+            store = try TaskStore(path: env["HUSH_DB_PATH"] ?? TaskStore.defaultURL().path) // override: throwaway DBs for testing
+        } catch {
             let alert = NSAlert()
             alert.messageText = "Hush can't open its task database"
             alert.informativeText = "\(error)"
@@ -48,16 +52,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover.behavior = .transient
         popover.animates = !Theme.reduceMotion
 
-        capture.onSave = { [weak self] title in
-            guard let store = self?.store else { return false }
-            do {
-                _ = try store.create(title: title, parent: store.inbox().id)
-                return true
-            } catch {
-                NSLog("Hush: capture failed: \(error)") // e.g. titleTooLong: panel stays open
-                return false
-            }
-        }
+        capture.store = store
+        outline = OutlineWindowController(store: store)
+        popoverModel.onOpenOutline = { [weak self] in self?.popover.performClose(nil); self?.outline.show() }
+        HistoryWindowController.shared.onHome = { [weak self] in self?.outline.show() }
+        if ProcessInfo.processInfo.environment["HUSH_OPEN_OUTLINE"] == "1" { outline.show() }
         menuBarSub = store.observeMenuBar(limit: 5) { [popoverModel] snap in
             popoverModel.recent = snap.recent.map { RecentTask(id: $0.id.raw, title: $0.title, createdAt: $0.createdAt) }
             popoverModel.openCount = snap.openCount
@@ -65,6 +64,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         HotKey.shared.handler = { [capture] in capture.toggle() }
         HotKey.shared.register()
     }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
+    @objc private func openOutline() { outline.show() }
+    @objc private func openHistory() { HistoryWindowController.shared.show(store: store) }
 
     @objc private func togglePopover() {
         guard let button = statusItem.button else { return }
@@ -85,7 +89,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let menu = NSMenu(title: title); item.submenu = menu
             for (t, sel, key) in items { menu.addItem(withTitle: t, action: sel, keyEquivalent: key) }
         }
-        add("Hush", [("Quit Hush", #selector(NSApplication.terminate(_:)), "q")])
+        add("Hush", [("Open Outline", #selector(openOutline), "o"), ("History", #selector(openHistory), "y"),
+                     ("Close Window", #selector(NSWindow.performClose(_:)), "w"),
+                     ("Quit Hush", #selector(NSApplication.terminate(_:)), "q")])
         add("Edit", [("Undo", Selector(("undo:")), "z"), ("Redo", Selector(("redo:")), "Z"),
                      ("Cut", #selector(NSText.cut(_:)), "x"), ("Copy", #selector(NSText.copy(_:)), "c"),
                      ("Paste", #selector(NSText.paste(_:)), "v"), ("Select All", #selector(NSText.selectAll(_:)), "a")])

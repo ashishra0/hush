@@ -62,7 +62,7 @@ A task is done when its criteria pass, `swift build` is warning-free and `swift 
 - [ ] With zero open tasks the rows are replaced by one caption line "All clear." and the count is hidden.
 - [ ] Footer: Open outline ⌘O and Quit Hush ⌘Q work by click and by key while the popover is open. "Settings…" is hidden until P2-03.
 
-**P0-09 · Frontend · Outline window v0 (read and complete)** · deps: P0-03, P0-05 · `todo`
+**P0-09 · Frontend · Outline window v0 (read and complete)** · deps: P0-03, P0-05 · `done`
 - [ ] ⌘O or "Open outline" opens one window (~1040×780, 720 content column, title "Home" 36 light, meta "N open"). Opening again focuses the existing window.
 - [ ] All open tasks appear as 32-high rows in store order, indented 24 per level; Inbox shows a folder glyph instead of a circle.
 - [ ] Clicking a circle completes the task; the row is removed (no animation in P0) and "N open" updates.
@@ -101,13 +101,13 @@ A task is done when its criteria pass, `swift build` is warning-free and `swift 
 **P1-06 · Backend · Parent search** · deps: P1-02 · `done`
 - [ ] Given a query string, returns open tasks whose title starts with it, case-insensitive, most recently modified first, max 5, each with its path. Empty query returns nothing.
 
-**P1-07 · Frontend · Nested outline rendering** · deps: P0-09, P1-01 · `todo`
+**P1-07 · Frontend · Nested outline rendering** · deps: P0-09, P1-01 · `done`
 - [ ] Row slots, chevron, hover, selected and editing states match DESIGN screen B in light and dark.
 - [ ] A collapsed parent shows its open-descendant count at the right; leaf rows show no chevron.
 - [ ] Nesting guides are 1px hairlines; the branch containing the selection draws its guide in accent.
 - [ ] Toolbar shows the breadcrumb; the bottom hint bar shows the shortcuts listed in DESIGN, minus "⌘/ All shortcuts" (D20).
 
-**P1-08 · Frontend · Keyboard navigation and editing** · deps: P1-07, P1-02 · `todo`
+**P1-08 · Frontend · Keyboard navigation and editing** · deps: P1-07, P1-02 · `done`
 - [ ] ↑/↓ move a single selection through visible rows; selection never lands on a hidden row.
 - [ ] Space or typing starts editing the selected row; Esc stops editing and keeps the text.
 - [ ] ↵ on a selected row creates a sibling below in edit mode. ↵ while editing splits at the caret: text after the caret moves to a new sibling below; children stay with the original.
@@ -115,7 +115,7 @@ A task is done when its criteria pass, `swift build` is warning-free and `swift 
 - [ ] ⌘⌫ deletes the selected row and its subtree; selection moves to next sibling, else previous, else parent.
 - [ ] Empty-title handling follows D12. Every shortcut is a no-op on Inbox where D1 forbids it.
 
-**P1-09 · Frontend · Zoom, breadcrumb, empty state** · deps: P1-08 · `todo`
+**P1-09 · Frontend · Zoom, breadcrumb, empty state** · deps: P1-08 · `done`
 - [ ] ⌘] zooms into the selected row: its title becomes the 36 light page title, its children the rows, "N open" its open descendants. ⌘[ zooms out one level with the former node selected.
 - [ ] Breadcrumb shows `Home / … / Node`; clicking a crumb zooms there.
 - [ ] Given a zoomed node with 0 open tasks, the "All clear." block fades in after 400 ms with the node name in the copy; ↵ creates its first child in edit mode.
@@ -126,7 +126,7 @@ A task is done when its criteria pass, `swift build` is warning-free and `swift 
 - [ ] The drop line appears only at valid targets per D15; releasing moves the task and its subtree there. Esc or release on an invalid target cancels with no change.
 - [ ] A drag is one undo step (once P1-12 lands).
 
-**P1-11 · Frontend · Strike & Fold** · deps: P1-07, P1-03 · `todo`
+**P1-11 · Frontend · Strike & Fold** · deps: P1-07, P1-03 · `done`
 - [ ] ⌘↵ or a circle click plays the timeline in DESIGN "Completion" (verify by screen recording frame-step: fill 0–90, strike 30–150, fade 90–160, fold 160–280 ms).
 - [ ] A parent's children strike top to bottom with 40 ms stagger, then the branch folds as one.
 - [ ] Five rapid ⌘↵ presses complete five rows; none is dropped or waits for a prior animation.
@@ -138,16 +138,16 @@ A task is done when its criteria pass, `swift build` is warning-free and `swift 
 - [ ] After a completion the toast "Done · <title>  ⌘Z Undo" rises 8px in 160 ms, holds 4 s, pauses while hovered, and is replaced by the next completion's toast.
 - [ ] While a title is being edited, ⌘Z undoes typing in the field only.
 
-**P1-13 · Frontend · History** · deps: P1-05, P1-07 · `todo`
-- [ ] ⌘Y shows "Home / History", title "Finished", meta "Kept forever, on this Mac"; ⌘[ or the Home crumb returns to the outline.
-- [ ] Rows grouped by day with headers and counts per D16 and D17; row shows faint filled check, unstruck ink-mute title, parent path, time.
-- [ ] ↑/↓ select rows. Hover or selection shows Restore; click or ⌘R restores and the row leaves History.
+**P1-13 · Frontend · History** · deps: P1-05, P1-07 · `done`
+- [x] ⌘Y shows "Home / History", title "Finished", meta "Kept forever, on this Mac"; ⌘[ or the Home crumb returns to the outline.
+- [x] Rows grouped by day with headers and counts per D16 and D17; row shows faint filled check, unstruck ink-mute title, parent path, time.
+- [x] ↑/↓ select rows. Hover or selection shows Restore; click or ⌘R restores and the row leaves History.
 
-**P1-14 · Frontend · Capture: Details, `/name`, draft, ⌥↵** · deps: P0-07, P1-02, P1-06 · `todo`
-- [ ] ⇥ in the title expands Details (Note, "Under" picker); ⇧⇥ returns to the title. In Note, ↵ is a newline and ⌘↵ saves. ↵ in the title always saves.
-- [ ] The "Under" picker and `/name` both use parent search and behave per D7; the footer destination and the saved pill name the chosen parent.
-- [ ] Given Esc with text entered, when the panel reopens within 60 s, then title, note and destination are restored; after 60 s or after a save it opens blank.
-- [ ] ⌥↵ saves, clears the fields, keeps the panel open and the destination unchanged; no pill is shown.
+**P1-14 · Frontend · Capture: Details, `/name`, draft, ⌥↵** · deps: P0-07, P1-02, P1-06 · `done`
+- [x] ⇥ in the title expands Details (Note, "Under" picker); ⇧⇥ returns to the title. In Note, ↵ is a newline and ⌘↵ saves. ↵ in the title always saves.
+- [x] The "Under" picker and `/name` both use parent search and behave per D7; the footer destination and the saved pill name the chosen parent.
+- [x] Given Esc with text entered, when the panel reopens within 60 s, then title, note and destination are restored; after 60 s or after a save it opens blank.
+- [x] ⌥↵ saves, clears the fields, keeps the panel open and the destination unchanged; no pill is shown.
 
 ## M3 — P2
 

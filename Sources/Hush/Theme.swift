@@ -3,15 +3,20 @@ import SwiftUI
 
 /// Design tokens from docs/DESIGN.md. Dynamic colors resolve light/dark per appearance.
 enum Theme {
-    private static func dyn(_ light: UInt32, _ dark: UInt32) -> Color {
+    private static func nsDyn(_ light: UInt32, _ dark: UInt32) -> NSColor {
         func ns(_ hex: UInt32) -> NSColor {
             NSColor(srgbRed: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255,
                     blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
         }
-        return Color(nsColor: NSColor(name: nil) { appearance in
+        return NSColor(name: nil) { appearance in
             ns(appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light)
-        })
+        }
     }
+    private static func dyn(_ light: UInt32, _ dark: UInt32) -> Color { Color(nsColor: nsDyn(light, dark)) }
+
+    // AppKit-side (text fields, caret) equivalents.
+    static let nsInk = nsDyn(0x1C1C1E, 0xF2F2F3)
+    static let nsAccent = nsDyn(0x0852FF, 0x3D7BFF)
 
     static let ground = dyn(0xEBEBEB, 0x0B0B0C)
     static let surface = dyn(0xFFFFFF, 0x1A1A1C)
