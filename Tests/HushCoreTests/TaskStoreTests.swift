@@ -316,7 +316,7 @@ private func date(_ d: Int, _ h: Int, _ m: Int) -> Date { utc.date(from: DateCom
         case 0, 1: try s.create(title: "n\(i)", parent: rnd(2) == 0 ? nil : pick)
         case 2: if let p = pick { try? s.indent(p) }
         case 3: if let p = pick { try? s.outdent(p) }
-        case 4: if let p = pick { try? s.moveUp(p) }
+        case 4: if let p = pick { _ = try? s.moveUp(p) }
         case 5: if let p = pick { try? s.move(p, newParent: all.isEmpty ? nil : all[rnd(all.count)], index: rnd(4)) }
         case 6: if let p = pick, rnd(3) == 0 { _ = try s.complete(p) }
         case 7: if let p = pick, rnd(3) == 0 { _ = try s.delete(p) }
