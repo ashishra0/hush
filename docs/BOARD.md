@@ -82,7 +82,7 @@ A task is done when its criteria pass, `swift build` is warning-free and `swift 
 - [x] After any sequence of operations, sibling orders are gap-free and unique (property-style test).
 - [x] The subtree query for any node returns open descendants plus an open-descendant count per node.
 
-**P1-03 · Backend · Cascade complete and soft delete** · deps: P1-02 · `todo` — rework: F1 blocker
+**P1-03 · Backend · Cascade complete and soft delete** · deps: P1-02 · `done` — F1 fixed (test: deleteKeepsCompletedDescendantsInHistory)
 - [x] Completing a parent gives the parent and every open descendant a completedAt in one transaction.
 - [ ] Delete sets deletedAt on the task and all its open descendants; deleted tasks appear in no list, count or History.
 - [x] Invariant test: no open task ever has a completed or deleted ancestor.
@@ -218,8 +218,8 @@ Review of c34774a by reading code and tests; nothing was run. Paths are relative
 
 | # | Criterion | Defect | Where | Severity |
 |---|---|---|---|---|
-| F1 | P1-03 box 2, D4 | Deleting a task also soft-deletes its already-completed descendants, so they vanish from History and the today count. Only open descendants should be deleted. | `HushCore/TaskStore.swift:264` (`notDeleted: true`) | **blocker** |
-| F2 | P1-05 box 1, D14 | The 04:00 boundary is computed by subtracting 4 absolute hours, so on the two DST-change days it sits one hour off. No DST test exists. | `HushCore/TaskStore.swift:420`, `:429-431`; `Tests/HushCoreTests/TaskStoreTests.swift:129` | minor |
+| F1 | P1-03 box 2, D4 | Deleting a task also soft-deletes its already-completed descendants, so they vanish from History and the today count. Only open descendants should be deleted. | `HushCore/TaskStore.swift:264` (`notDeleted: true`) | fixed (**blocker**) |
+| F2 | P1-05 box 1, D14 | The 04:00 boundary is computed by subtracting 4 absolute hours, so on the two DST-change days it sits one hour off. No DST test exists. | `HushCore/TaskStore.swift:420`, `:429-431`; `Tests/HushCoreTests/TaskStoreTests.swift:129` | fixed (minor) |
 | F3 | P0-07 box 2 | The saved pill appears at full opacity at once; the 180 ms morph-in is missing (hold and fade are correct). | `Hush/CapturePanel.swift:344-350` | minor |
 | F4 | P0-08 box 5 | With zero open tasks the header still shows "0 of 0 open"; the count should be hidden. | `Hush/PopoverView.swift:45-52` | minor |
 | F5 | P0-08 box 6, DESIGN C | Popover footer has a "History ⌘Y" row that is not in the design. Remove the row; ⌘Y still works through the menu. | `Hush/PopoverView.swift:72-73` | minor |
@@ -227,8 +227,8 @@ Review of c34774a by reading code and tests; nothing was run. Paths are relative
 | F7 | P2-03, DESIGN D | Appearance is a segmented control, not the three preview tiles. | `Hush/SettingsWindow.swift:167-169` | minor |
 | F8 | P2-04 box 3 | A shortcut on a non-letter key displays as "Key 18" in Settings and the popover. | `Hush/HotKey.swift:68-71` | minor |
 | F9 | D26 | Rejected actions call `NSSound.beep()`. | `Hush/OutlineModel.swift:225`, `:233`, `:279`, `:285`; `Hush/CapturePanel.swift:334-335` | minor |
-| F10 | P1-04 box 3, D5 | Restoring from History empties the whole undo and redo stacks, so an earlier completion can no longer be undone. Restore should only skip adding a step. | `HushCore/TaskStore.swift:285` | minor |
-| F11 | P0-03 box 5 | No test covers the `observe…` functions. | `Tests/HushCoreTests/TaskStoreTests.swift` | minor |
+| F10 | P1-04 box 3, D5 | Restoring from History empties the whole undo and redo stacks, so an earlier completion can no longer be undone. Restore should only skip adding a step. | `HushCore/TaskStore.swift:285` | fixed (minor) |
+| F11 | P0-03 box 5 | No test covers the `observe…` functions. | `Tests/HushCoreTests/TaskStoreTests.swift` | fixed (minor) |
 
 Not defects: P1-01's Frontend sign-off was never recorded (Requests is empty); moot now that both sides shipped.
 

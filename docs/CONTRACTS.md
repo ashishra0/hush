@@ -37,7 +37,7 @@ Top level (`parentID == nil`) = Inbox + user projects. Quick Capture default: `c
 ## Undo / redo (D21)
 `undo()` / `redo()` -> `[TaskID]` (ids touched; empty = nothing to do, never an error), `canUndo`, `canRedo`.
 One app-wide, in-memory stack (100 steps) of row snapshots; each step restores exact parent/index. Covered: create, update (title/note), move, indent, outdent, moveUp/Down, complete (whole cascade), delete (whole subtree). A new action clears redo.
-NOT undoable: `setCollapsed`, `restore(fromHistory:)`. `restore`, `undoComplete(receipt)` and `undoDelete(receipt)` clear both stacks -- use `undo()` instead of the receipt API.
+NOT undoable: `setCollapsed`, `restore(fromHistory:)`. `delete` only soft-deletes OPEN descendants (completed ones stay in History). `undoComplete(receipt)` and `undoDelete(receipt)` clear both stacks; `restore` just isn't recorded -- use `undo()` instead of the receipt API.
 
 ## Parent search (D7)
 `searchParents(prefix:limit: 5) -> [ParentMatch { task, path }]`: open tasks (Inbox included) whose title starts with prefix, case-insensitive, newest created first. Blank prefix -> [].

@@ -331,3 +331,62 @@ private func date(_ d: Int, _ h: Int, _ m: Int) -> Date { utc.date(from: DateCom
     // every open task is reachable from the outline => no open task hides under a completed/deleted ancestor
     #expect(flat(try s.outline()).filter { !$0.task.isInbox }.count == (try s.openCount()))
 }
+
+private var ny: Calendar { var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "America/New_York")!; return c }
+private func nyDate(_ m: Int, _ d: Int, _ h: Int, _ min: Int = 0) -> Date {
+    ny.date(from: DateComponents(year: 2026, month: m, day: d, hour: h, minute: min))!
+}
+
+@Test func dayBoundaryIsCorrectOnDSTDays() throws {
+    for (m, d) in [(3, 8), (11, 1)] {                      // spring forward, fall back
+        let (s, c) = try make()
+        let ids = try (0..<4).map { try s.create(title: "t\($0)").id }
+        for (id, when) in zip(ids, [nyDate(m, d, 3, 59), nyDate(m, d, 4), nyDate(m, d + 1, 3, 59), nyDate(m, d + 1, 4)]) {
+            c.t = when; _ = try s.complete(id)
+        }
+        let h = try s.history(calendar: ny)
+        #expect(h.map { $0.entries.map(\.task.title) } == [["t3"], ["t2", "t1"], ["t0"]])
+        #expect(h[1].day == ny.startOfDay(for: nyDate(m, d, 12)))
+        #expect(try s.todaySummary(now: nyDate(m, d, 4, 30), calendar: ny).doneCount == 2)
+        #expect(try s.todaySummary(now: nyDate(m, d, 3, 30), calendar: ny).doneCount == 1)
+        #expect(try s.todaySummary(now: nyDate(m, d + 1, 3, 30), calendar: ny).doneCount == 2)
+    }
+}
+
+@Test func deleteKeepsCompletedDescendantsInHistory() throws {
+    let (s, c) = try make()
+    let p = try s.create(title: "p"), done = try s.create(title: "done", parent: p.id), open = try s.create(title: "open", parent: p.id)
+    c.t = date(20, 9, 0); _ = try s.complete(done.id)
+    let r = try s.delete(p.id)
+    #expect(Set(r.ids) == [p.id, open.id])
+    #expect(try s.history(calendar: utc).first?.entries.map(\.task.title) == ["done"])
+    #expect(try s.todaySummary(now: date(20, 10, 0), calendar: utc).doneCount == 1)
+    try s.undo()
+    #expect(try s.task(done.id).completedAt != nil && s.task(open.id).completedAt == nil)
+    try s.redo(); try s.undoDelete(r)
+    #expect(try s.task(done.id).completedAt != nil && titles(s, p.id) == ["open"])
+}
+
+@Test func restoreKeepsUndoStacks() throws {
+    let (s, _) = try make()
+    let a = try s.create(title: "a"), b = try s.create(title: "b")
+    _ = try s.complete(a.id); _ = try s.complete(b.id)
+    try s.undo()                                            // b back
+    try s.restore(fromHistory: a.id)
+    #expect(s.canUndo && s.canRedo)
+    try s.redo()                                            // b completed again
+    #expect(try titles(s) == ["Inbox", "a"])
+}
+
+@Test func observeDeliversInitialAndChangedSnapshots() async throws {
+    let (s, _) = try make()
+    let (stream, cont) = AsyncStream<MenuBarSnapshot>.makeStream()
+    let sub = s.observeMenuBar(limit: 5) { cont.yield($0) }
+    var it = stream.makeAsyncIterator()
+    #expect(await it.next()?.openCount == 0)
+    try s.create(title: "x")
+    var last: MenuBarSnapshot?
+    while let snap = await it.next() { last = snap; if snap.openCount == 1 { break } }
+    #expect(last?.recent.map(\.title) == ["x"])
+    sub.cancel()
+}

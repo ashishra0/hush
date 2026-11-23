@@ -52,7 +52,7 @@ struct ClosureView: View {
             Text(summary.copy.closing).font(Theme.bodyFont.italic()).foregroundStyle(Theme.inkMute)
             Rectangle().fill(Theme.hairline).frame(height: 1)
             HStack(spacing: Theme.s4) {
-                hint("↵", "Reflect"); Spacer(); hint("⌘Y", "History")
+                Spacer(); hint("⌘Y", "History")
             }
         }
         .padding(Theme.s4)

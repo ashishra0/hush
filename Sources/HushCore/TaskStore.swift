@@ -261,7 +261,8 @@ public final class TaskStore: Sendable {
         return try record { db in
             let t = try db.task(id.raw)
             if t.isInbox { throw HushError.inboxProtected }
-            let ids = try db.subtree(of: id.raw, notDeleted: true)
+            var ids = try db.subtree(of: id.raw, openOnly: true)   // completed descendants stay in History
+            if !ids.contains(id.raw) { ids.insert(id.raw, at: 0) }
             try db.execute(sql: "UPDATE task SET deletedAt = ? WHERE id IN (\(ids.map(String.init).joined(separator: ",")))",
                            arguments: [ts])
             try db.setOrder(parent: t.parentID?.raw, ids: try db.openChildren(of: t.parentID?.raw))
@@ -282,7 +283,7 @@ public final class TaskStore: Sendable {
     @discardableResult
     public func restore(fromHistory id: TaskID) throws -> TaskItem {
         try db.write { db in
-            undoLog.clear()  // not on the undo stack (D21 / receipt API)
+            // not recorded (D21); leaves the undo/redo stacks alone
             let t = try db.task(id.raw)
             var p = t.parentID?.raw
             while let cur = p {
@@ -387,6 +388,17 @@ public final class TaskStore: Sendable {
 
     // MARK: Read implementations
 
+    /// 04:00 on the given calendar day (via Calendar, so DST days are right).
+    private static func boundary(of day: Date, _ cal: Calendar) -> Date {
+        cal.date(bySettingHour: dayBoundaryHour, minute: 0, second: 0, of: cal.startOfDay(for: day))!
+    }
+
+    /// Local midnight of the day `t` belongs to under the 04:00 boundary.
+    static func logicalDay(of t: Date, _ cal: Calendar) -> Date {
+        let midnight = cal.startOfDay(for: t)
+        return t >= boundary(of: midnight, cal) ? midnight : cal.startOfDay(for: cal.date(byAdding: .day, value: -1, to: midnight)!)
+    }
+
     private static func readOutline(_ db: Database, root: TaskID?) throws -> [OutlineNode] {
         let rows = try Row.fetchAll(db, sql: "SELECT * FROM task WHERE completedAt IS NULL AND deletedAt IS NULL ORDER BY position, id")
         let byParent = Dictionary(grouping: rows.map(TaskItem.init), by: { $0.parentID })
@@ -417,8 +429,7 @@ public final class TaskStore: Sendable {
         }
         var days: [(Date, [HistoryEntry])] = []
         for t in done {
-            let shifted = calendar.date(byAdding: .hour, value: -dayBoundaryHour, to: t.completedAt!)!
-            let day = calendar.startOfDay(for: shifted)
+            let day = Self.logicalDay(of: t.completedAt!, calendar)
             let e = HistoryEntry(task: t, path: path(t))
             if days.last?.0 == day { days[days.count - 1].1.append(e) } else { days.append((day, [e])) }
         }
@@ -426,10 +437,9 @@ public final class TaskStore: Sendable {
     }
 
     private static func readToday(_ db: Database, now: Date, calendar: Calendar) throws -> TodaySummary {
-        let shifted = calendar.date(byAdding: .hour, value: -dayBoundaryHour, to: now)!
-        let dayStart = calendar.startOfDay(for: shifted)
-        let start = calendar.date(byAdding: .hour, value: dayBoundaryHour, to: dayStart)!
-        let end = calendar.date(byAdding: .day, value: 1, to: start)!
+        let day = logicalDay(of: now, calendar)
+        let start = boundary(of: day, calendar)
+        let end = boundary(of: calendar.date(byAdding: .day, value: 1, to: day)!, calendar)
         let args: StatementArguments = [start.timeIntervalSince1970, end.timeIntervalSince1970]
         let count = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM task WHERE deletedAt IS NULL AND completedAt >= ? AND completedAt < ?", arguments: args) ?? 0
         let titles = try String.fetchAll(db, sql: "SELECT title FROM task WHERE deletedAt IS NULL AND completedAt >= ? AND completedAt < ? ORDER BY completedAt DESC, id DESC LIMIT 3", arguments: args)

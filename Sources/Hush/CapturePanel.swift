@@ -331,8 +331,8 @@ final class CaptureController {
         if let store {
             do {
                 _ = try store.create(title: title, note: model.note, parent: try model.parent?.task.id ?? store.inbox().id)
-            } catch { NSSound.beep(); NSLog("Hush: capture failed: \(error)"); return }
-        } else if !onSave(title) { NSSound.beep(); return }
+            } catch { NSLog("Hush: capture failed: \(error)"); return }
+        } else if !onSave(title) { return }
         draftAt = nil
         if keepOpen { model.reset(keepParent: true); model.field = .title; return } // D9: no pill
         model.reset()
@@ -346,8 +346,18 @@ final class CaptureController {
         let host = NSHostingView(rootView: PillView(destination: destination))
         pill.contentView = host
         place(pill, size: host.fittingSize, on: screen)
-        pill.alphaValue = 1
+        // 180ms morph in: scale ~0.96 -> 1 plus opacity (opacity only with Reduce Motion).
+        let end = pill.frame
+        if !Theme.reduceMotion {
+            pill.setFrame(end.insetBy(dx: end.width * 0.02, dy: end.height * 0.02), display: false)
+        }
+        pill.alphaValue = 0
         pill.orderFrontRegardless()
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.18
+            pill.animator().alphaValue = 1
+            pill.animator().setFrame(end, display: true)
+        }
         let hide = DispatchWorkItem { [pill] in
             NSAnimationContext.runAnimationGroup({ ctx in
                 ctx.duration = Theme.reduceMotion ? 0 : 0.15
@@ -355,7 +365,7 @@ final class CaptureController {
             }, completionHandler: { pill.orderOut(nil) })
         }
         pillHide = hide
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9, execute: hide)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18 + 0.9, execute: hide)
     }
 
     /// Grow/shrink the panel downward, keeping the top edge fixed.

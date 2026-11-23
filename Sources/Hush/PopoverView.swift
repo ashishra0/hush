@@ -17,7 +17,6 @@ final class PopoverModel {
     var onCapture: () -> Void = {}
     var onComplete: (RecentTask) -> Void = { _ in }
     var onOpenOutline: () -> Void = {}
-    var onHistory: () -> Void = {}
     var onSettings: () -> Void = {}
     var onQuit: () -> Void = {}
 }
@@ -45,7 +44,7 @@ struct PopoverView: View {
             HStack {
                 Text("RECENT").font(Theme.keycapFont).tracking(0.6)
                 Spacer()
-                Text("\(model.recent.count) of \(model.openCount) open").font(Theme.captionFont)
+                if model.openCount > 0 { Text("\(model.recent.count) of \(model.openCount) open").font(Theme.captionFont) }
             }
             .foregroundStyle(Theme.inkFaint)
             .padding(.horizontal, Theme.s4)
@@ -69,8 +68,6 @@ struct PopoverView: View {
             VStack(spacing: 0) {
                 FooterRow(title: "Open outline", keys: "⌘O", action: model.onOpenOutline)
                     .keyboardShortcut("o", modifiers: .command)
-                FooterRow(title: "History", keys: "⌘Y", action: model.onHistory)
-                    .keyboardShortcut("y", modifiers: .command)
                 FooterRow(title: "Settings…", keys: "⌘,", action: model.onSettings)
                     .keyboardShortcut(",", modifiers: .command)
                 FooterRow(title: "Quit Hush", keys: "⌘Q", action: model.onQuit)

@@ -65,9 +65,32 @@ final class HotKey {
         if modifiers & UInt32(optionKey) != 0 { s += "⌥" }
         if modifiers & UInt32(shiftKey) != 0 { s += "⇧" }
         if modifiers & UInt32(cmdKey) != 0 { s += "⌘" }
-        let letters: [Int: String] = [0: "A", 11: "B", 8: "C", 2: "D", 14: "E", 3: "F", 5: "G", 4: "H", 34: "I",
-            38: "J", 40: "K", 37: "L", 46: "M", 45: "N", 31: "O", 35: "P", 12: "Q", 15: "R", 1: "S", 17: "T",
-            32: "U", 9: "V", 13: "W", 7: "X", 16: "Y", 6: "Z"]
-        return s + (Int(keyCode) == kVK_Space ? "Space" : letters[Int(keyCode)] ?? "Key \(keyCode)")
+        return s + Self.keyName(keyCode)
+    }
+
+    private static let specials: [Int: String] = [
+        kVK_Space: "Space", kVK_Return: "Return", kVK_Tab: "Tab", kVK_Escape: "Esc", kVK_Delete: "Delete",
+        kVK_ForwardDelete: "Fwd Delete", kVK_LeftArrow: "←", kVK_RightArrow: "→", kVK_UpArrow: "↑",
+        kVK_DownArrow: "↓", kVK_Home: "Home", kVK_End: "End", kVK_PageUp: "Page Up", kVK_PageDown: "Page Down",
+        kVK_F1: "F1", kVK_F2: "F2", kVK_F3: "F3", kVK_F4: "F4", kVK_F5: "F5", kVK_F6: "F6", kVK_F7: "F7",
+        kVK_F8: "F8", kVK_F9: "F9", kVK_F10: "F10", kVK_F11: "F11", kVK_F12: "F12",
+    ]
+
+    /// Specials from a table; printable keys via the current keyboard layout (so ";" or "ö" show correctly).
+    private static func keyName(_ code: UInt32) -> String {
+        if let n = specials[Int(code)] { return n }
+        if let src = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue(),
+           let p = TISGetInputSourceProperty(src, kTISPropertyUnicodeKeyLayoutData) {
+            let data = Unmanaged<CFData>.fromOpaque(p).takeUnretainedValue()
+            var dead: UInt32 = 0
+            var chars = [UniChar](repeating: 0, count: 4)
+            var len = 0
+            let ok = CFDataGetBytePtr(data).withMemoryRebound(to: UCKeyboardLayout.self, capacity: 1) {
+                UCKeyTranslate($0, UInt16(code), UInt16(kUCKeyActionDisplay), 0, UInt32(LMGetKbdType()),
+                               OptionBits(kUCKeyTranslateNoDeadKeysBit), &dead, 4, &len, &chars)
+            }
+            if ok == noErr, len > 0 { return String(utf16CodeUnits: chars, count: len).uppercased() }
+        }
+        return "Key \(code)"
     }
 }

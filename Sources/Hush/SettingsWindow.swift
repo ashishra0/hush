@@ -163,10 +163,13 @@ struct SettingsView: View {
                 }
             }
             divider
-            row("Appearance") {
-                Picker("", selection: Binding(get: { model.appearance }, set: { model.setAppearance($0) })) {
-                    Text("System").tag("system"); Text("Light").tag("light"); Text("Dark").tag("dark")
-                }.pickerStyle(.segmented).labelsHidden().frame(width: 220)
+            VStack(alignment: .leading, spacing: Theme.s3) {
+                Text("Appearance").font(Theme.bodyFont).foregroundStyle(Theme.ink)
+                HStack(spacing: Theme.s3) {
+                    tile("system", "System")
+                    tile("light", "Light")
+                    tile("dark", "Dark")
+                }
             }
             divider
             VStack(alignment: .leading, spacing: Theme.s2) {
@@ -179,6 +182,28 @@ struct SettingsView: View {
         .padding(Theme.s6)
         .frame(width: 560, alignment: .leading)
         .background(Theme.surface)
+    }
+
+    private func tile(_ tag: String, _ label: String) -> some View {
+        let light = Color(white: 0.97), dark = Color(white: 0.12)
+        let on = model.appearance == tag
+        return Button { model.setAppearance(tag) } label: {
+            VStack(spacing: Theme.s1) {
+                ZStack {
+                    if tag == "system" {
+                        HStack(spacing: 0) { light; dark }
+                    } else { tag == "light" ? light : dark }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Capsule().frame(width: 40, height: 4); Capsule().frame(width: 28, height: 4)
+                    }
+                    .foregroundStyle(tag == "dark" ? Color.white.opacity(0.5) : tag == "light" ? Color.black.opacity(0.3) : Color.gray)
+                }
+                .frame(height: 64)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.rRow))
+                .overlay(RoundedRectangle(cornerRadius: Theme.rRow).strokeBorder(on ? Theme.ink : Theme.hairline, lineWidth: on ? 2 : 1))
+                Text(label).font(Theme.captionFont).foregroundStyle(on ? Theme.ink : Theme.inkMute)
+            }
+        }.buttonStyle(.plain).frame(maxWidth: .infinity)
     }
 
     private var divider: some View { Rectangle().fill(Theme.hairline).frame(height: 1) }

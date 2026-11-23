@@ -55,7 +55,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         capture.store = store
         outline = OutlineWindowController(store: store)
-        popoverModel.onHistory = { [weak self] in self?.popover.performClose(nil); self?.openHistory() }
         popoverModel.onSettings = { [weak self] in self?.popover.performClose(nil); SettingsWindowController.shared.show() }
         ClosureCard.onHistory = { [weak self] in self?.openHistory() }
         popoverModel.onOpenOutline = { [weak self] in self?.popover.performClose(nil); self?.outline.show() }

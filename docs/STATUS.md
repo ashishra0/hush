@@ -1,16 +1,16 @@
 # Status (Team Lead)
 
-**Milestone:** M2 — P1 core experience. (M1/P0 code-complete; manual hotkey test pending with user.)
+**Milestone:** MVP (M1–M3) code-complete. Awaiting manual runtime pass (docs/BOARD.md "Manual test script").
 
 | Area | Owner | State |
 |---|---|---|
-| Backlog, acceptance criteria | PM | done (docs/BOARD.md); idle until review |
-| HushCore: store, outline, completion, history, undo/redo, parent search, closure copy | Backend | done, 25 tests green; idle |
-| Outline window, nested rendering, keyboard, zoom, Strike & Fold | Frontend-1 | in progress |
-| History window, capture Details / `/name` / draft / ⌥↵ | Frontend-2 | in progress |
-| Drag reorder (P1-10), undo wiring + toast (P1-12) | Frontend-1 | next |
+| Backlog, acceptance review, manual test script | PM | done |
+| HushCore (store, outline, cascade, undo/redo, history, summaries) | Backend | done — 29 tests green |
+| Capture panel, hotkey, menu bar, outline, drag, Strike & Fold, undo toast | Frontend-1 | built; `review` (needs real keystrokes) |
+| History, capture Details//name/draft, Settings, Daily Closure card | Frontend-2 | built; `review` (needs real keystrokes) |
 
-**Verified at runtime:** app bundles + launches, menu bar icon renders, hotkey registers without error.
-**Not yet verified:** pressing ⌘⇧Space → panel → save → focus return (no desktop automation available; needs a human).
-**Decisions:** Carbon hotkey (not KeyboardShortcuts); `create(parent: nil)` = top-level (capture passes Inbox); D8 pill has no ⌘Z (accepted); D20 cuts ⌘/ sheet and ↵ Reflect; frontend must use `store.undo()` not receipts.
-**Blockers:** none.
+**Runtime-verified by Team Lead:** bundle + launch; menu bar icon; hotkey registers; outline render (nesting, accent branch guide, collapsed counts, hidden completed, N open, centered hint bar, All clear). 
+**Not verified (no desktop automation here):** keystroke paths, hotkey → capture → focus return, mouse drag, animation timing, light mode, Settings/Closure visuals.
+**Review findings:** F1 blocker + F2–F11 fixed.
+**Deferred post-MVP:** Find (⌘F), full-screen reflection, Quiet Momentum, Focus Mode, ⌘/ shortcuts sheet.
+**Decisions:** Carbon hotkey; parent:nil = top-level; D8 no ⌘Z on pill; D20 cuts; D25 Find deferred; D26 no beeps.

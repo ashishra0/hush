@@ -222,7 +222,7 @@ final class OutlineModel {
         switch e {
         case .task(let id):
             guard !text.isEmpty, let old = node(id)?.task, old.title != text else { return }
-            do { _ = try store.update(id, title: text) } catch { NSSound.beep() }
+            do { _ = try store.update(id, title: text) } catch {}
         case .draft:
             guard let d = draft else { return }
             draft = nil
@@ -230,7 +230,7 @@ final class OutlineModel {
                 selection = (d.after ?? d.parent).flatMap { node($0) != nil ? $0 : nil } ?? navRows.first?.task?.id
             } else if let t = try? store.create(title: text, parent: d.parent, after: d.after) {
                 selection = t.id
-            } else { NSSound.beep() }
+            }
         }
         reload()
     }
@@ -276,13 +276,13 @@ final class OutlineModel {
         switch e {
         case .draft:
             guard hasBefore, let d = draft else { return }
-            guard let t = try? store.create(title: before, parent: d.parent, after: d.after) else { NSSound.beep(); return }
+            guard let t = try? store.create(title: before, parent: d.parent, after: d.after) else { return }
             (anchor, parent) = (t.id, d.parent)
             draft = nil
         case .task(let id):
             guard let t = node(id)?.task else { return }
             if !hasBefore { commitEditing(); startDraft(parent: t.parentID, after: id); return }
-            do { _ = try store.update(id, title: before) } catch { NSSound.beep(); return }
+            do { _ = try store.update(id, title: before) } catch { return }
             (anchor, parent) = (id, t.parentID)
         }
         editing = nil
