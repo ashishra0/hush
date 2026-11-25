@@ -1,4 +1,4 @@
-# Contributing
+# Contributing to Hush
 
 Thanks for helping. Hush is deliberately small: a fix or polish is more welcome than a new feature. For anything bigger than a bug fix, open an issue first so we can agree it fits.
 
@@ -17,7 +17,7 @@ Sources/Hush/       the menu bar app (SwiftUI + AppKit). No SQL.
 Tests/HushCoreTests Swift Testing suite for HushCore
 Resources/Fonts/    Geist Sans / Mono (OFL), copied into the .app by scripts/bundle.sh
 scripts/            bundle.sh (build the .app), screenshots.sh (UI screenshots)
-docs/               architecture, HushCore API, design tokens and specs
+docs/               architecture, HushCore API, design spec, design boards, README demo source
 ```
 
 ## Trying UI changes safely
@@ -31,7 +31,10 @@ HUSH_DB_PATH=/tmp/hush-dev.sqlite HUSH_OPEN=outline,popover \
 `scripts/screenshots.sh light /tmp/shots outline` seeds sample tasks and captures the windows; attach light and dark screenshots to UI pull requests.
 
 ## Pull requests
-- `swift build` with no new warnings, `swift test` green.
-- New HushCore behavior comes with a test; update [docs/CORE-API.md](docs/CORE-API.md) if the public API changes.
-- UI uses tokens from `Theme.swift` only (see [docs/DESIGN.md](docs/DESIGN.md)); check light and dark, keyboard access and Reduce Motion.
-- Keep it quiet: no sounds, badges, streaks or notifications.
+
+Before you open one:
+
+- [ ] `swift build` with no new warnings, `swift test` green.
+- [ ] New HushCore behavior comes with a test; update [docs/CORE-API.md](docs/CORE-API.md) if the public API changes.
+- [ ] UI uses tokens from `Theme.swift` only (see [docs/DESIGN.md](docs/DESIGN.md)); check light and dark, keyboard access and Reduce Motion.
+- [ ] Keep it quiet: no sounds, badges, streaks or notifications.

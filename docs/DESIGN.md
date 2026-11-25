@@ -2,6 +2,14 @@
 
 Hush follows Vercel's [Geist](https://vercel.com/geist/introduction) design system. `Sources/Hush/Theme.swift` is the source of truth for tokens.
 
+Reference boards (exported from the Paper file, page "9 · Geist (current)"):
+
+| | |
+|---|---|
+| ![Foundations](design/foundations.png) | ![Quick Capture](design/quick-capture.png) |
+| ![Outline, light](design/outline-light.png) | ![Outline, dark](design/outline-dark.png) |
+| ![Popover and Settings](design/popover-settings.png) | |
+
 ## Tokens
 | Token | Light | Dark | Geist |
 |---|---|---|---|
