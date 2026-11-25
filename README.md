@@ -72,12 +72,6 @@ Hush shows up as a small circle in the menu bar. Turn on **Launch at login** in 
 | **Views** | <kbd>⌘</kbd><kbd>O</kbd> outline · <kbd>⌘</kbd><kbd>F</kbd> find · <kbd>⌘</kbd><kbd>Y</kbd> history · <kbd>⌘</kbd><kbd>D</kbd> today · <kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd> focus · <kbd>⌘</kbd><kbd>/</kbd> all shortcuts |
 | **Everywhere** | <kbd>⌘</kbd><kbd>Z</kbd> undo · <kbd>⇧</kbd><kbd>⌘</kbd><kbd>Z</kbd> redo |
 
-## Design
-
-Hush is built on Vercel's [Geist](https://vercel.com/geist/introduction) design system: neutral grays everywhere, one blue reserved for the caret, focus and the moment a task is completed. Tokens, type and component specs live in [docs/DESIGN.md](docs/DESIGN.md), with reference boards in [docs/design](docs/design).
-
-<img src="docs/design/foundations.png" alt="Geist foundations: colour tokens, type scale, keycaps and radii" width="760">
-
 ## Development
 
 ```sh
