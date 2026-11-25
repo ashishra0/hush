@@ -8,9 +8,9 @@ let package = Package(
         .package(url: "https://github.com/groue/GRDB.swift", from: "7.0.0"),
     ],
     targets: [
-        // Backend-owned: models, persistence, services. No AppKit/SwiftUI imports.
+        // Models, persistence, undo, summaries. No AppKit/SwiftUI imports.
         .target(name: "HushCore", dependencies: [.product(name: "GRDB", package: "GRDB.swift")]),
-        // Frontend-owned: SwiftUI/AppKit app.
+        // The menu bar app: SwiftUI + AppKit.
         .executableTarget(name: "Hush", dependencies: ["HushCore"]),
         .testTarget(name: "HushCoreTests", dependencies: ["HushCore"]),
     ]

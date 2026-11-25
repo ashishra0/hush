@@ -48,7 +48,7 @@ enum Theme {
     static var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
 }
 
-/// Inline keycap (Paper "Keyboard shortcut indicators"): SF Pro glyphs, 20 high, 22+ wide, surface-sunk + 1px hairline.
+/// Inline keycap: Geist Sans 12, 20 high, 22+ wide, surface-sunk + 1px hairline.
 struct Keycap: View {
     let text: String
     var body: some View {

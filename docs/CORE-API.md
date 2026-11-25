@@ -1,4 +1,6 @@
-# HushCore public API (Backend-owned). Frontend: request changes under "Requests" at the bottom.
+# HushCore public API
+
+The app target (`Hush`) talks to persistence only through this API. Change it here when you change the code.
 
 `import HushCore`. All types Sendable. Methods are synchronous and `throws` (GRDB queue, fine on MainActor at this scale).
 Observation callbacks arrive on the **main queue**, first value immediately after subscribing, then on every change.
@@ -13,7 +15,7 @@ Top level (`parentID == nil`) = Inbox + user projects. Quick Capture default: `c
 
 ## Types
 - `TaskID(raw: Int64)` Hashable/Codable. `TaskItem { id, parentID?, position, title, note, createdAt, completedAt?, isInbox, collapsed }`
-- `OutlineNode { task, children: [OutlineNode], openChildCount (direct), openDescendantCount (D13: what "N open"/collapsed rows show) }` — open tasks only; children ordered.
+- `OutlineNode { task, children: [OutlineNode], openChildCount (direct), openDescendantCount(what "N open"/collapsed rows show) }` — open tasks only; children ordered.
 - `CompletionReceipt { root: TaskItem, ids, completedAt }`, `DeletionReceipt { root, ids }` — pass back to `undo…`.
 - `HistoryDay { day: Date (local midnight of the 04:00-adjusted day), entries: [HistoryEntry] }` newest first; `HistoryEntry { task, path: [String] }` (ancestor titles).
 - `TodaySummary { doneCount, latestTitles (≤3, newest first) }`, `MenuBarSnapshot { recent: [TaskItem], openCount }` (Inbox excluded from both).
@@ -34,15 +36,15 @@ Top level (`parentID == nil`) = Inbox + user projects. Quick Capture default: `c
 - `delete(id) -> DeletionReceipt` (soft, whole subtree), `undoDelete(receipt)`
 - `restore(fromHistory: id) -> TaskItem` (nearest open ancestor, else top level; appended at end; its completed descendants stay in History)
 
-## Undo / redo (D21)
+## Undo / redo
 `undo()` / `redo()` -> `[TaskID]` (ids touched; empty = nothing to do, never an error), `canUndo`, `canRedo`.
 One app-wide, in-memory stack (100 steps) of row snapshots; each step restores exact parent/index. Covered: create, update (title/note), move, indent, outdent, moveUp/Down, complete (whole cascade), delete (whole subtree). A new action clears redo.
 NOT undoable: `setCollapsed`, `restore(fromHistory:)`. `delete` only soft-deletes OPEN descendants (completed ones stay in History). `undoComplete(receipt)` and `undoDelete(receipt)` clear both stacks; `restore` just isn't recorded -- use `undo()` instead of the receipt API.
 
-## Parent search (D7)
+## Parent search
 `searchParents(prefix:limit: 5) -> [ParentMatch { task, path }]`: open tasks (Inbox included) whose title starts with prefix, case-insensitive, newest created first. Blank prefix -> [].
 
-## Closure (D18)
+## Closure
 `TodaySummary` now has `openCount` and `copy: ClosureCopy { headline, closing }` (all-clear pair when no open tasks, else by doneCount: 0 / 1 / 2-5 / >=6). `ClosureCopy.choose(doneCount:openCount:)` is pure.
 
 ## M4 additions
@@ -52,17 +54,15 @@ NOT undoable: `setCollapsed`, `restore(fromHistory:)`. `delete` only soft-delete
 - `nextOpenTask(after: id, within: root?, skippingSubtree: false) -> TaskItem?`: next open task in outline pre-order, Inbox node itself skipped (its children included), nil at the end. Works after `id` was completed (uses its old position). Use `skippingSubtree: true` when `id` is being completed (its children complete too). Throws `.notFound` if `id` isn't under `root`.
 - `find(_ query, root: TaskID? = nil) -> [FindMatch { task, ancestors (below root, outermost first), ranges: [Range<String.Index>] in task.title }]`: open tasks, title substring, case/diacritic-insensitive, outline order. Blank -> [].
 - `findHistory(_ query, calendar:) -> [HistoryDay]` same grouping as `history`, entries filtered by title (searches all history, not just the latest 500).
-- Today's count for toolbar marks: use `observeToday` (re-reads on every DB change, using the injected clock). It does NOT fire at the 04:00 rollover by itself: Frontend should re-query `todaySummary()` when the app wakes, on `NSCalendarDayChanged`, and via one timer at `TaskStore.nextDayBoundary(after: now)`.
+- Today's count for toolbar marks: use `observeToday` (re-reads on every DB change, using the injected clock). It does NOT fire at the 04:00 rollover by itself: the app re-queries `todaySummary()` when the app wakes, on `NSCalendarDayChanged`, and via one timer at `TaskStore.nextDayBoundary(after: now)`.
 
 ## Observation
 `observeOutline(root:onChange:)`, `observeMenuBar(limit:onChange:)`, `observeHistory(calendar:onChange:)`, `observeToday(calendar:onChange:)` -> `Subscription`.
 Note: `observeToday` re-reads only on DB change, not when 04:00 passes; re-subscribe or call `todaySummary` on popover open.
 
 ## Rules
-Titles (D12): newlines -> spaces, trimmed, 1-500 chars, else `.emptyTitle`/`.titleTooLong` and nothing is written; notes <= 10,000 (`.noteTooLong`). Applies to `create` and `update`.
-Inbox (D15): always first at top level; `move` at root clamps index >= 1, `moveUp` can't swap above it, nothing moves into own subtree. `create(parent: nil)` = top level (NOT Inbox): pass `inbox().id` for capture.
-Restore (D5): original parent if open, else nearest open ancestor, else top level; end; single task.
+Titles: newlines -> spaces, trimmed, 1-500 chars, else `.emptyTitle`/`.titleTooLong` and nothing is written; notes <= 10,000 (`.noteTooLong`). Applies to `create` and `update`.
+Inbox: always first at top level; `move` at root clamps index >= 1, `moveUp` can't swap above it, nothing moves into own subtree. `create(parent: nil)` = top level (NOT Inbox): pass `inbox().id` for capture.
+Restore: original parent if open, else nearest open ancestor, else top level; end; single task.
 Day boundary 04:00 local (`TaskStore.dayBoundaryHour`). Sibling `position` renumbered 0..n-1 (open siblings) in one transaction on every change. Completed/deleted tasks never appear in outline/recent/search.
 
-## Requests
-(none yet)

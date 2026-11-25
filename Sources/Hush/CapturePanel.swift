@@ -266,7 +266,7 @@ final class CaptureController {
         panel.contentView = host
         place(panel, size: host.fittingSize)
         // No NSApp.activate(): a .nonactivatingPanel takes keystrokes without activating
-        // Hush, and activating would raise the outline window too (user-reported bug).
+        // Hush, and activating would raise the outline window too.
         panel.makeKeyAndOrderFront(nil)
         monitor = monitor ?? NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] e in
             nonisolated(unsafe) let ev = e

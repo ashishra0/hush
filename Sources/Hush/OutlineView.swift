@@ -299,7 +299,7 @@ struct RowView: View {
     private var editingMe: Bool {
         anim == nil && !lifted && model.editing == (isDraft ? .draft : .task(row.task!.id))
     }
-    /// The single accent-wash row. Never while editing (Paper "editing": plain row), never an ancestor.
+    /// The single selected row. Never while editing (the edited row is plain), never an ancestor.
     private var selected: Bool {
         anim == nil && !lifted && !isDraft && model.editing == nil && model.selection == row.task?.id
     }
@@ -466,7 +466,7 @@ struct DashedCircle: View {
     }
 }
 
-/// Persistent ghost row at the end of a level (Paper outline): click to start a new task there.
+/// Persistent ghost row at the end of a level: click to start a new task there.
 struct AddRow: View {
     let model: OutlineModel
     @State private var hover = false
@@ -711,7 +711,7 @@ struct ShortcutsSheet: View {
 
 // MARK: Inline editor
 
-/// Field editor whose caret is only as tall as the text (Paper: a slim accent caret, not a full-row bar).
+/// Field editor whose caret is only as tall as the text (a slim accent caret, not a full-row bar).
 final class CaretTextView: NSTextView {
     override func drawInsertionPoint(in rect: NSRect, color: NSColor, turnedOn flag: Bool) {
         var r = rect
